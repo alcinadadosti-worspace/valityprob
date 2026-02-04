@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: slack-validade-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: TZ
+        value: America/Maceio
+      - key: NODE_VERSION
+        value: 18
