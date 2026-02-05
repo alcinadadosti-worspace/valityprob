@@ -61,14 +61,25 @@ const runNotificationJob = async (app) => {
       });
 
       try {
+        // Abre (ou obtém) uma conversa direta com o usuário e envia a mensagem
+        // Algumas workspaces exigem que se chame conversations.open para obter um channel id
+        let channelId = managerId;
+        try {
+          const conv = await app.client.conversations.open({ users: managerId });
+          if (conv && conv.channel && conv.channel.id) channelId = conv.channel.id;
+        } catch (openErr) {
+          // se falhar, tentamos continuar usando managerId como canal
+          console.warn(`Aviso: conversations.open falhou para ${managerId}:`, openErr && openErr.message);
+        }
+
         await app.client.chat.postMessage({
-          channel: managerId,
+          channel: channelId,
           text: msgText,
           mrkdwn: true
         });
-        console.log(`Mensagem enviada para ${managerId} com ${items.length} itens.`);
+        console.log(`Mensagem enviada para ${managerId} (canal ${channelId}) com ${items.length} itens.`);
       } catch (slackError) {
-        console.error(`Erro ao enviar mensagem para ${managerId}:`, slackError.message);
+        console.error(`Erro ao enviar mensagem para ${managerId}:`, slackError && slackError.message);
       }
     }
 
@@ -83,4 +94,4 @@ const runNotificationJob = async (app) => {
   }
 };
 
-module.exports = { scheduleNotifications };
+module.exports = { scheduleNotifications, runNotificationJob };

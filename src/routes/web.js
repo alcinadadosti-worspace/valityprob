@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { addProduct } = require('../storage/csvStore');
 const { isValidDateString } = require('../utils/dates');
+const { listProducts } = require('../storage/csvStore');
+const { runNotificationJob } = require('../scheduler/notify');
+const slackAppModule = require('../slack/app');
 
 router.use(express.urlencoded({ extended: true }));
 
@@ -114,3 +117,69 @@ router.post('/add', (req, res) => {
 });
 
 module.exports = router;
+
+// Rota administrativa simples (lista produtos e permite disparar notificações manualmente)
+router.get('/admin', (req, res) => {
+  const products = listProducts();
+  const rows = products.map(p => `
+    <tr>
+      <td>${p.SKU}</td>
+      <td>${p.NOME}</td>
+      <td>${p.VALIDADE}</td>
+      <td>${p.MANAGER_ID}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Admin — Produtos</title>
+        <style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #e6e6e6;padding:8px}button{padding:8px 12px;background:#006837;color:#fff;border:none;border-radius:6px;cursor:pointer}</style>
+      </head>
+      <body>
+        <h2>Produtos cadastrados</h2>
+        <p><button id="trigger">Disparar notificações agora</button></p>
+        <table>
+          <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Manager ID</th></tr></thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+        <div id="resp" style="margin-top:12px"></div>
+        <script>
+          document.getElementById('trigger').addEventListener('click', async () => {
+            const resp = document.getElementById('resp');
+            resp.textContent = 'Executando...';
+            try {
+              const r = await fetch('/admin/notify', { method: 'POST' });
+              const j = await r.json();
+              resp.textContent = j.message || JSON.stringify(j);
+            } catch (err) {
+              resp.textContent = 'Erro: ' + err.message;
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `;
+
+  res.send(html);
+});
+
+router.post('/admin/notify', async (req, res) => {
+  const { app } = slackAppModule; // pode ser null se não configurado
+  if (!app) {
+    return res.status(400).json({ ok: false, message: 'Slack App não está configurado (cheque variáveis de ambiente).' });
+  }
+
+  try {
+    await runNotificationJob(app);
+    res.json({ ok: true, message: 'Job de notificação executado (ver logs para detalhes).' });
+  } catch (err) {
+    console.error('Erro ao executar job manualmente:', err);
+    res.status(500).json({ ok: false, message: 'Erro ao executar job.' });
+  }
+});
