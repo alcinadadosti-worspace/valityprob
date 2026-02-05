@@ -13,10 +13,12 @@ router.get('/', (req, res) => {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#006837">
     <title>Cadastro de Demonstrador — O Boticário</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20fill='%23006837'%20rx='12'%20width='100%25'%20height='100%25'/%3E%3Ctext%20x='50%25'%20y='55%25'%20font-family='Inter,Arial'%20font-size='28'%20fill='white'%20text-anchor='middle'%3EOB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/public/style.css">
   </head>
   <body>
@@ -41,37 +43,41 @@ router.get('/', (req, res) => {
       </div>
 
       <div class="card">
-        <form id="productForm">
-          <div>
-            <label for="sku">SKU</label>
-            <input id="sku" name="sku" required placeholder="Ex: 123456">
-          </div>
+        <form id="productForm" aria-describedby="formHelp">
+          <fieldset style="border:0;padding:0;margin:0;">
+            <legend class="full" style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:8px">Cadastrar Demonstrador</legend>
 
-          <div>
-            <label for="nome">Nome / Descrição</label>
-            <input id="nome" name="nome" required placeholder="Ex: Batom Vermelho">
-          </div>
+            <div class="field">
+              <label for="sku">SKU</label>
+              <input id="sku" name="sku" required placeholder="Ex: 123456" inputmode="numeric" aria-required="true">
+            </div>
 
-          <div>
-            <label for="validade">Validade</label>
-            <input id="validade" name="validade" type="date" required>
-          </div>
+            <div class="field">
+              <label for="nome">Nome / Descrição</label>
+              <input id="nome" name="nome" required placeholder="Ex: Batom Vermelho" aria-required="true">
+            </div>
 
-          <div>
-            <label for="managerId">Slack Member ID do Gerente</label>
-            <input id="managerId" name="managerId" required placeholder="U0123ABC">
-          </div>
+            <div class="field">
+              <label for="validade">Validade</label>
+              <input id="validade" name="validade" type="date" required aria-required="true">
+            </div>
 
-          <div class="full">
-            <p class="note">Dica: o Slack Member ID é necessário para que o gerente receba DMs com avisos de validade.</p>
-          </div>
+            <div class="field">
+              <label for="managerId">Slack Member ID do Gerente</label>
+              <input id="managerId" name="managerId" required placeholder="U0123ABC" aria-required="true">
+            </div>
 
-          <div class="full actions">
-            <button type="button" class="secondary" id="resetBtn">Limpar</button>
-            <button type="submit" id="submitBtn">Salvar</button>
-          </div>
+            <div class="full">
+              <p id="formHelp" class="note">Dica: copie o Slack Member ID no perfil do gerente (Copiar ID).</p>
+            </div>
 
-          <div id="resp" class="full" aria-live="polite"></div>
+            <div class="full actions">
+              <button type="button" class="secondary" id="resetBtn">Limpar</button>
+              <button type="submit" id="submitBtn" aria-live="polite">Salvar</button>
+            </div>
+          </fieldset>
+
+          <div id="resp" class="full" role="status" aria-live="polite"></div>
         </form>
       </div>
     </div>
