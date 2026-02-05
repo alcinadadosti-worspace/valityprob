@@ -223,6 +223,21 @@ router.post('/admin/test', async (req, res) => {
           return res.json({ ok: true, message: `Mensagem enviada via conversations.open para ${user}` });
         }
       }
+
+      // Tentar im.open (legacy) se disponível e se conversations.open não existir
+      if (app.client && app.client.im && typeof app.client.im.open === 'function') {
+        try {
+          const conv2 = await app.client.im.open({ user });
+          const channelId2 = conv2 && conv2.channel && conv2.channel.id;
+          if (channelId2) {
+            await app.client.chat.postMessage({ channel: channelId2, text: testText });
+            return res.json({ ok: true, message: `Mensagem enviada via im.open para ${user}` });
+          }
+        } catch (imErr) {
+          console.error('im.open falhou:', imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
+        }
+      }
+
       console.error('Erro ao enviar teste:', postErr && (postErr.data && postErr.data.error) || postErr.message || postErr);
       return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
     }

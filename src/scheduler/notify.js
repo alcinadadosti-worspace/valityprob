@@ -74,6 +74,7 @@ const runNotificationJob = async (app) => {
         const errCode = postErr && postErr.data && postErr.data.error;
         console.warn(`postMessage falhou para ${managerId}:`, errCode || postErr.message || postErr);
 
+        // Se conversations.open não estiver disponível, tente im.open (legacy) se presente
         if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
           try {
             const conv = await app.client.conversations.open({ users: managerId });
@@ -87,8 +88,21 @@ const runNotificationJob = async (app) => {
           } catch (openErr) {
             console.error(`Erro ao abrir/conversar com ${managerId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
           }
+        } else if (app.client && app.client.im && typeof app.client.im.open === 'function') {
+          try {
+            const conv = await app.client.im.open({ user: managerId });
+            const channelId = conv && conv.channel && conv.channel.id;
+            if (channelId) {
+              await app.client.chat.postMessage({ channel: channelId, text: msgText, mrkdwn: true });
+              console.log(`Mensagem enviada via im.open para ${managerId} (canal ${channelId}).`);
+            } else {
+              console.error(`im.open não retornou channel.id para ${managerId}`);
+            }
+          } catch (imErr) {
+            console.error(`Erro ao abrir IM para ${managerId}:`, imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
+          }
         } else {
-          console.error(`conversations.open não disponível no cliente. Não foi possível enviar DM para ${managerId}.`);
+          console.error(`Nem conversations.open nem im.open estão disponíveis no cliente. Não foi possível enviar DM para ${managerId}.`);
         }
       }
     }
