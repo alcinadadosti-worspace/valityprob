@@ -13,6 +13,12 @@ const PORT = process.env.PORT || 3000;
 receiver.router.use('/public', express.static(path.join(__dirname, '..', 'public')));
 receiver.router.use('/', webRoutes);
 
+// Servir logo que foi colocado na raiz do repositório como /public/logo.png
+receiver.router.get('/public/logo.png', (req, res) => {
+  const logoPath = path.join(__dirname, '..', 'ChatGPT Image 9 de jan. de 2026, 09_03_28.png');
+  res.sendFile(logoPath);
+});
+
 receiver.router.get('/health', (req, res) => {
   res.status(200).send('OK');
 });

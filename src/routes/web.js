@@ -25,16 +25,7 @@ router.get('/', (req, res) => {
     <div class="container">
       <div class="header">
         <div class="logo" aria-hidden="true">
-          <svg width="56" height="56" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="O Boticário">
-            <defs>
-              <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0%" stop-color="#007442" />
-                <stop offset="100%" stop-color="#005c2e" />
-              </linearGradient>
-            </defs>
-            <rect rx="12" width="56" height="56" fill="url(#g)" />
-            <text x="50%" y="55%" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="22" fill="#fff" text-anchor="middle" dominant-baseline="middle">OB</text>
-          </svg>
+          <img src="/public/logo.png" alt="Logo da empresa" class="logo-img">
         </div>
         <div>
           <h1>Cadastro de Demonstrador</h1>

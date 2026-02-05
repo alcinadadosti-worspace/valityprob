@@ -4,6 +4,7 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,sans-ser
 .container{width:100%;max-width:840px;padding:32px}
 .header{display:flex;align-items:center;gap:18px;margin-bottom:22px}
 .logo{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center}
+ .logo-img{width:64px;height:64px;object-fit:cover;border-radius:12px;box-shadow:0 6px 16px rgba(2,6,23,0.08)}
 h1{font-size:22px;margin:0;color:#0f172a}
 p.lead{margin:6px 0 0;color:var(--muted);font-size:14px}
 .card{background:var(--card);border-radius:14px;box-shadow:0 10px 30px rgba(15,23,42,0.08);padding:24px;margin-top:16px}
