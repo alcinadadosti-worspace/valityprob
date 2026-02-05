@@ -44,10 +44,13 @@
     try {
       setLoading(true);
       clearErrors();
+      // Convert FormData to URLSearchParams so express.urlencoded can parse it
+      const params = new URLSearchParams();
+      for (const pair of data.entries()) params.append(pair[0], pair[1]);
       const res = await fetch('/add', {
         method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        body: data
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: params.toString()
       });
       const json = await res.json().catch(() => null);
       if (res.ok) {
