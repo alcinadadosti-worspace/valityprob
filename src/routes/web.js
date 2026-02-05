@@ -61,8 +61,16 @@ router.get('/', (req, res) => {
             </div>
 
             <div class="field">
-              <label for="managerId">Slack Member ID do Gerente</label>
-              <input id="managerId" name="managerId" required placeholder="U0123ABC" aria-required="true">
+              <label for="managerId">Gestor (selecione o nome)</label>
+              <select id="managerId" name="managerId" required aria-required="true">
+                <option value="">-- selecione o gestor --</option>
+                ${(() => {
+                  try {
+                    const managers = require('../config/managers.json');
+                    return managers.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+                  } catch (e) { return '<option disabled>Erro carregando gestores</option>'; }
+                })()}
+              </select>
             </div>
 
             <div class="full">

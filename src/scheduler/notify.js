@@ -95,40 +95,55 @@ const buildAlertPayload = (items) => {
 const sendAlertsToManager = async (app, managerId, items) => {
   const payload = buildAlertPayload(items);
 
+  // Resolve managerId: it can be a Slack user ID (starts with U) or a manager name
+  let slackUserId = managerId;
+  if (!slackUserId || !String(slackUserId).startsWith('U')) {
+    // Try to resolve from managers config
+    try {
+      // require is fine here; file is part of the repo
+      const managers = require('../config/managers.json');
+      const m = managers.find(mm => mm.name === managerId);
+      if (m && m.slackId) slackUserId = m.slackId;
+      else throw new Error(`Slack ID não configurado para o gestor: ${managerId}`);
+    } catch (e) {
+      throw new Error(`Falha ao resolver Slack ID para gestor ${managerId}: ${e.message}`);
+    }
+  }
+
   // Tenta postar diretamente usando user id
   try {
-    await app.client.chat.postMessage({ channel: managerId, text: payload.text, blocks: payload.blocks });
+    await app.client.chat.postMessage({ channel: slackUserId, text: payload.text, blocks: payload.blocks });
     return;
   } catch (postErr) {
     const errCode = postErr && postErr.data && postErr.data.error;
-    console.warn(`postMessage direto falhou para ${managerId}:`, errCode || postErr.message || postErr);
+    console.warn(`postMessage direto falhou para ${slackUserId}:`, errCode || postErr.message || postErr);
   }
 
   // Fallback para conversations.open
   if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
     try {
-      const conv = await app.client.conversations.open({ users: managerId });
+      const conv = await app.client.conversations.open({ users: slackUserId });
       const channelId = conv && conv.channel && conv.channel.id;
       if (channelId) {
         await app.client.chat.postMessage({ channel: channelId, text: payload.text, blocks: payload.blocks });
         return;
       }
     } catch (openErr) {
-      console.error(`conversations.open falhou para ${managerId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
+      console.error(`conversations.open falhou para ${slackUserId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
     }
   }
 
   // Fallback legacy im.open
   if (app.client && app.client.im && typeof app.client.im.open === 'function') {
     try {
-      const conv2 = await app.client.im.open({ user: managerId });
+      const conv2 = await app.client.im.open({ user: slackUserId });
       const channelId2 = conv2 && conv2.channel && conv2.channel.id;
       if (channelId2) {
         await app.client.chat.postMessage({ channel: channelId2, text: payload.text, blocks: payload.blocks });
         return;
       }
     } catch (imErr) {
-      console.error(`im.open falhou para ${managerId}:`, imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
+      console.error(`im.open falhou para ${slackUserId}:`, imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
     }
   }
 
