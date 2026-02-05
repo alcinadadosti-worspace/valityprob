@@ -34,8 +34,9 @@ router.get('/', (req, res) => {
           <img src="/public/logo.png" alt="Logo da empresa" class="logo-img">
         </div>
         <div>
-          <h1>Cadastro de Demonstrador</h1>
-          <p class="lead">Adicione produtos e informe o gerente para receber notificações no Slack.</p>
+            <h1>Cadastro de Demonstrador</h1>
+            <p class="lead">Adicione produtos e informe o gerente para receber notificações no Slack.</p>
+            <p style="margin-top:8px"><a href="/items" style="color:#006837;font-weight:600;text-decoration:none">Ver todos os itens cadastrados</a> &nbsp;·&nbsp; <a href="/admin" style="color:#006837;text-decoration:none">Área administrativa</a></p>
         </div>
       </div>
 
@@ -188,6 +189,44 @@ router.get('/admin', (req, res) => {
 
   res.send(html);
 });
+
+  // Lista pública de itens cadastrados (aba separada)
+  router.get('/items', (req, res) => {
+    const products = listProducts();
+    const rows = products.map(p => `
+      <tr>
+        <td>${p.SKU}</td>
+        <td>${p.NOME}</td>
+        <td>${p.VALIDADE}</td>
+        <td>${p.MANAGER_ID}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Itens Cadastrados</title>
+        <link rel="stylesheet" href="/public/style.css">
+        <style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #e6e6e6;padding:8px}th{background:#f7faf9;text-align:left}</style>
+      </head>
+      <body>
+        <a href="/" style="display:inline-block;margin-bottom:12px;color:#006837;text-decoration:none">← Voltar</a>
+        <h2>Itens Cadastrados (${products.length})</h2>
+        <table>
+          <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Manager ID</th></tr></thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </body>
+    </html>
+    `;
+
+    res.send(html);
+  });
 
 router.post('/admin/notify', async (req, res) => {
   const { app } = slackAppModule; // pode ser null se não configurado
