@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { addProduct } = require('../storage/csvStore');
+const { addProduct } = require('../storage');
 const { isValidDateString } = require('../utils/dates');
-const { listProducts } = require('../storage/csvStore');
+const { listProducts } = require('../storage');
 const { runNotificationJob, sendAlertsToManager } = require('../scheduler/notify');
 const { parseDate, daysUntil } = require('../utils/dates');
 const slackAppModule = require('../slack/app');

@@ -1,5 +1,5 @@
 const { App, ExpressReceiver } = require('@slack/bolt');
-const { addProduct } = require('../storage/csvStore');
+const { addProduct } = require('../storage');
 const { isValidDateString } = require('../utils/dates');
 
 // Verifica se existe um token que parece real (começa com xoxb-)

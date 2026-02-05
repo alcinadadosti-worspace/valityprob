@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { listProducts } = require('../storage/csvStore');
+const { listProducts } = require('../storage');
 const { parseDate, daysUntil, TIMEZONE, getToday } = require('../utils/dates');
 
 // Memória simples para evitar duplicação no mesmo ciclo de vida do processo
