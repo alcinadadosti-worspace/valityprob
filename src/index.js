@@ -5,21 +5,38 @@ const { scheduleNotifications } = require('./scheduler/notify');
 
 const PORT = process.env.PORT || 3000;
 
-// Inicializa o Scheduler (Cron)
-scheduleNotifications(app);
-
-// Configura rotas da Web no ExpressReceiver (que é uma aplicação Express)
-// O receiver expõe o Express app através de `receiver.router`
+// Configura rotas da Web
 receiver.router.use('/', webRoutes);
 
-// Endpoint de Healthcheck para o Render não dormir/verificar status
 receiver.router.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Inicia o servidor
+// Função principal de inicialização
 (async () => {
-  await app.start(PORT);
-  console.log(`⚡️ Slack Validade Bot rodando na porta ${PORT}!`);
-  console.log(`🌎 Timezone configurada: ${process.env.TZ || 'Sistema'}`);
+  const hasToken = process.env.SLACK_BOT_TOKEN && process.env.SLACK_BOT_TOKEN.startsWith('xoxb-');
+
+  if (hasToken) {
+    // MODO COMPLETO (COM SLACK)
+    try {
+      await app.start(PORT);
+      scheduleNotifications(app);
+      console.log(`⚡️ MODO BOT ATIVO: Rodando na porta ${PORT}!`);
+    } catch (error) {
+      console.error('❌ Erro ao conectar no Slack. Iniciando apenas modo WEB.', error.message);
+      startWebOnly();
+    }
+  } else {
+    // MODO APENAS SITE (SEM SLACK)
+    console.log('⚠️ Nenhum token do Slack encontrado. Iniciando em MODO WEB APENAS.');
+    startWebOnly();
+  }
 })();
+
+function startWebOnly() {
+  // Inicia apenas o Express (o site), ignorando o bot do Slack
+  receiver.app.listen(PORT, () => {
+    console.log(`🌐 MODO WEB ATIVO: Acesse o site na porta ${PORT}`);
+    console.log(`⚠️ O bot do Slack e as notificações NÃO estão rodando.`);
+  });
+}
