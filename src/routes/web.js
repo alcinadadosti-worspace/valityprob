@@ -17,31 +17,7 @@ router.get('/', (req, res) => {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-      :root{--bg:#f6faf8;--card:#ffffff;--accent:#006837;--muted:#6b7280;--brand:#ffd24d}
-      *{box-sizing:border-box}
-      body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial,sans-serif;background:linear-gradient(180deg,#f0f8f5 0%,var(--bg) 100%);margin:0;padding:32px;display:flex;align-items:center;justify-content:center;min-height:100vh}
-      .container{width:100%;max-width:800px;padding:24px}
-      .header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-      .logo{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center}
-      h1{font-size:20px;margin:0}
-      p.lead{margin:4px 0 0;color:var(--muted)}
-      .card{background:var(--card);border-radius:12px;box-shadow:0 6px 20px rgba(15,23,42,0.06);padding:20px;margin-top:12px}
-      form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-      .full{grid-column:1/-1}
-      label{display:block;font-size:13px;color:#111827;margin-bottom:6px}
-      input,select,button{font-size:15px}
-      input,select{width:100%;padding:10px 12px;border:1px solid #e6eef0;border-radius:8px;background:transparent}
-      input:focus{outline:none;box-shadow:0 0 0 4px rgba(0,102,68,0.06);border-color:var(--accent)}
-      .actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:6px}
-      button{background:var(--accent);color:#fff;padding:10px 16px;border-radius:8px;border:none;cursor:pointer}
-      button.secondary{background:#eef2f1;color:#0f172a}
-      .note{font-size:13px;color:var(--muted)}
-      .message{padding:10px;border-radius:8px;margin-top:12px;font-weight:600}
-      .success{background:#ecfdf5;color:#065f46}
-      .error{background:#fff1f2;color:#7f1d1d}
-      @media(max-width:640px){form{grid-template-columns:1fr} .header{gap:10px} .logo{width:48px;height:48px}}
-    </style>
+    <link rel="stylesheet" href="/public/style.css">
   </head>
   <body>
     <div class="container">
@@ -100,41 +76,7 @@ router.get('/', (req, res) => {
       </div>
     </div>
 
-    <script>
-      const form = document.getElementById('productForm');
-      const resp = document.getElementById('resp');
-      const resetBtn = document.getElementById('resetBtn');
-
-      resetBtn.addEventListener('click', () => { form.reset(); resp.innerHTML = ''; resp.className = ''; });
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        resp.innerHTML = '';
-        resp.className = '';
-
-        const data = new FormData(form);
-        try {
-          const res = await fetch('/add', {
-            method: 'POST',
-            headers: { 'Accept': 'application/json' },
-            body: data
-          });
-          const json = await res.json().catch(() => null);
-          if (res.ok) {
-            resp.textContent = (json && json.message) ? json.message : 'Produto cadastrado com sucesso!';
-            resp.className = 'message success';
-            form.reset();
-          } else {
-            const msg = (json && json.message) ? json.message : 'Erro ao cadastrar';
-            resp.textContent = msg;
-            resp.className = 'message error';
-          }
-        } catch (err) {
-          resp.textContent = 'Falha de rede. Tente novamente.';
-          resp.className = 'message error';
-        }
-      });
-    </script>
+    <script src="/public/app.js" defer></script>
   </body>
   </html>
   `;

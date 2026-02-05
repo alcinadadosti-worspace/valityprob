@@ -2,11 +2,15 @@ require('dotenv').config();
 const { app, receiver } = require('./slack/app');
 const webRoutes = require('./routes/web');
 const { scheduleNotifications } = require('./scheduler/notify');
+const express = require('express');
+const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
 // Configura rotas da Web no ExpressReceiver
 // (Isso funciona independente do Bot estar ativo)
+// Servir arquivos estáticos (CSS/JS) colocados em src/public
+receiver.router.use('/public', express.static(path.join(__dirname, '..', 'public')));
 receiver.router.use('/', webRoutes);
 
 receiver.router.get('/health', (req, res) => {
