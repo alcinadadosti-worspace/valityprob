@@ -9,14 +9,20 @@ const PORT = process.env.PORT || 3000;
 
 // Configura rotas da Web no ExpressReceiver
 // (Isso funciona independente do Bot estar ativo)
-// Servir arquivos estáticos (CSS/JS) colocados em src/public
+// Servir arquivos estáticos (CSS/JS) colocados em src/public (prioritário)
+receiver.router.use('/public', express.static(path.join(__dirname, 'public')));
+// Fallback: também aceite um diretório /public na raiz do repositório (compatibilidade)
 receiver.router.use('/public', express.static(path.join(__dirname, '..', 'public')));
 receiver.router.use('/', webRoutes);
 
-// Servir logo que foi colocado na raiz do repositório como /public/logo.png
+// Servir logo a partir de src/public/logo.png se existir, senão procurar na raiz
+const fs = require('fs');
 receiver.router.get('/public/logo.png', (req, res) => {
-  const logoPath = path.join(__dirname, '..', 'ChatGPT Image 9 de jan. de 2026, 09_03_28.png');
-  res.sendFile(logoPath);
+  const fromSrc = path.join(__dirname, 'public', 'logo.png');
+  const fromRoot = path.join(__dirname, '..', 'ChatGPT Image 9 de jan. de 2026, 09_03_28.png');
+  if (fs.existsSync(fromSrc)) return res.sendFile(fromSrc);
+  if (fs.existsSync(fromRoot)) return res.sendFile(fromRoot);
+  res.status(404).end();
 });
 
 receiver.router.get('/health', (req, res) => {
