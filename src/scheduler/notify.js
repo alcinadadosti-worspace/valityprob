@@ -61,25 +61,35 @@ const runNotificationJob = async (app) => {
       });
 
       try {
-        // Abre (ou obtém) uma conversa direta com o usuário e envia a mensagem
-        // Algumas workspaces exigem que se chame conversations.open para obter um channel id
-        let channelId = managerId;
-        try {
-          const conv = await app.client.conversations.open({ users: managerId });
-          if (conv && conv.channel && conv.channel.id) channelId = conv.channel.id;
-        } catch (openErr) {
-          // se falhar, tentamos continuar usando managerId como canal
-          console.warn(`Aviso: conversations.open falhou para ${managerId}:`, openErr && openErr.message);
-        }
-
+        // Primeiro tentamos postar diretamente usando o user ID como canal.
+        // Em muitos workspaces isso funciona sem precisar chamar conversations.open.
         await app.client.chat.postMessage({
-          channel: channelId,
+          channel: managerId,
           text: msgText,
           mrkdwn: true
         });
-        console.log(`Mensagem enviada para ${managerId} (canal ${channelId}) com ${items.length} itens.`);
-      } catch (slackError) {
-        console.error(`Erro ao enviar mensagem para ${managerId}:`, slackError && slackError.message);
+        console.log(`Mensagem enviada diretamente para ${managerId} com ${items.length} itens.`);
+      } catch (postErr) {
+        // Se falhar, tentamos abrir uma conversa (se o método estiver disponível)
+        const errCode = postErr && postErr.data && postErr.data.error;
+        console.warn(`postMessage falhou para ${managerId}:`, errCode || postErr.message || postErr);
+
+        if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
+          try {
+            const conv = await app.client.conversations.open({ users: managerId });
+            const channelId = conv && conv.channel && conv.channel.id;
+            if (channelId) {
+              await app.client.chat.postMessage({ channel: channelId, text: msgText, mrkdwn: true });
+              console.log(`Mensagem enviada via conversations.open para ${managerId} (canal ${channelId}).`);
+            } else {
+              console.error(`conversations.open não retornou channel.id para ${managerId}`);
+            }
+          } catch (openErr) {
+            console.error(`Erro ao abrir/conversar com ${managerId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
+          }
+        } else {
+          console.error(`conversations.open não disponível no cliente. Não foi possível enviar DM para ${managerId}.`);
+        }
       }
     }
 
