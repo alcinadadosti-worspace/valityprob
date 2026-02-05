@@ -50,60 +50,14 @@ const runNotificationJob = async (app) => {
       }
     });
 
-    // 2. Enviar DMs consolidadas
+    // 2. Enviar DMs consolidadas usando helper para montar payload e enviar
     for (const [managerId, items] of Object.entries(alertsByManager)) {
       if (items.length === 0) continue;
-
-      let msgText = `⚠️ *Lembrete: faltam 7 dias para vencer ${items.length} demonstrador(es):*\n\n`;
-      
-      items.forEach(item => {
-        msgText += `• *SKU ${item.SKU}* — ${item.NOME} — vence em ${item.VALIDADE}\n`;
-      });
-
       try {
-        // Primeiro tentamos postar diretamente usando o user ID como canal.
-        // Em muitos workspaces isso funciona sem precisar chamar conversations.open.
-        await app.client.chat.postMessage({
-          channel: managerId,
-          text: msgText,
-          mrkdwn: true
-        });
-        console.log(`Mensagem enviada diretamente para ${managerId} com ${items.length} itens.`);
-      } catch (postErr) {
-        // Se falhar, tentamos abrir uma conversa (se o método estiver disponível)
-        const errCode = postErr && postErr.data && postErr.data.error;
-        console.warn(`postMessage falhou para ${managerId}:`, errCode || postErr.message || postErr);
-
-        // Se conversations.open não estiver disponível, tente im.open (legacy) se presente
-        if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
-          try {
-            const conv = await app.client.conversations.open({ users: managerId });
-            const channelId = conv && conv.channel && conv.channel.id;
-            if (channelId) {
-              await app.client.chat.postMessage({ channel: channelId, text: msgText, mrkdwn: true });
-              console.log(`Mensagem enviada via conversations.open para ${managerId} (canal ${channelId}).`);
-            } else {
-              console.error(`conversations.open não retornou channel.id para ${managerId}`);
-            }
-          } catch (openErr) {
-            console.error(`Erro ao abrir/conversar com ${managerId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
-          }
-        } else if (app.client && app.client.im && typeof app.client.im.open === 'function') {
-          try {
-            const conv = await app.client.im.open({ user: managerId });
-            const channelId = conv && conv.channel && conv.channel.id;
-            if (channelId) {
-              await app.client.chat.postMessage({ channel: channelId, text: msgText, mrkdwn: true });
-              console.log(`Mensagem enviada via im.open para ${managerId} (canal ${channelId}).`);
-            } else {
-              console.error(`im.open não retornou channel.id para ${managerId}`);
-            }
-          } catch (imErr) {
-            console.error(`Erro ao abrir IM para ${managerId}:`, imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
-          }
-        } else {
-          console.error(`Nem conversations.open nem im.open estão disponíveis no cliente. Não foi possível enviar DM para ${managerId}.`);
-        }
+        await sendAlertsToManager(app, managerId, items);
+        console.log(`Mensagem enviada para ${managerId} com ${items.length} itens.`);
+      } catch (err) {
+        console.error(`Falha ao enviar alertas para ${managerId}:`, err && (err.data && err.data.error) || err.message || err);
       }
     }
 
@@ -118,4 +72,67 @@ const runNotificationJob = async (app) => {
   }
 };
 
-module.exports = { scheduleNotifications, runNotificationJob };
+// Constroi o payload (texto e blocks) usado nas mensagens de alerta
+const buildAlertPayload = (items) => {
+  const textFallback = `⚠️ Lembrete: faltam ${items.length} demonstrador(es) que vencem em 7 dias.`;
+
+  const blocks = [];
+  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `:warning: *Lembrete de validade — faltam 7 dias*\nForam encontrados *${items.length}* demonstrador(es) que vencem em 7 dias.` } });
+  blocks.push({ type: 'divider' });
+
+  items.forEach(item => {
+    const line = `*${item.NOME}* — SKU ${item.SKU} — vence em ${item.VALIDADE}`;
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `• ${line}` } });
+  });
+
+  blocks.push({ type: 'divider' });
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: 'Envio automático — verifique o demonstrador e atualize o estoque se necessário.' }] });
+
+  return { text: textFallback, blocks };
+};
+
+// Envia DM para um manager (usa postMessage direto e realiza fallbacks)
+const sendAlertsToManager = async (app, managerId, items) => {
+  const payload = buildAlertPayload(items);
+
+  // Tenta postar diretamente usando user id
+  try {
+    await app.client.chat.postMessage({ channel: managerId, text: payload.text, blocks: payload.blocks });
+    return;
+  } catch (postErr) {
+    const errCode = postErr && postErr.data && postErr.data.error;
+    console.warn(`postMessage direto falhou para ${managerId}:`, errCode || postErr.message || postErr);
+  }
+
+  // Fallback para conversations.open
+  if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
+    try {
+      const conv = await app.client.conversations.open({ users: managerId });
+      const channelId = conv && conv.channel && conv.channel.id;
+      if (channelId) {
+        await app.client.chat.postMessage({ channel: channelId, text: payload.text, blocks: payload.blocks });
+        return;
+      }
+    } catch (openErr) {
+      console.error(`conversations.open falhou para ${managerId}:`, openErr && (openErr.data && openErr.data.error) || openErr.message || openErr);
+    }
+  }
+
+  // Fallback legacy im.open
+  if (app.client && app.client.im && typeof app.client.im.open === 'function') {
+    try {
+      const conv2 = await app.client.im.open({ user: managerId });
+      const channelId2 = conv2 && conv2.channel && conv2.channel.id;
+      if (channelId2) {
+        await app.client.chat.postMessage({ channel: channelId2, text: payload.text, blocks: payload.blocks });
+        return;
+      }
+    } catch (imErr) {
+      console.error(`im.open falhou para ${managerId}:`, imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
+    }
+  }
+
+  throw new Error('Não foi possível abrir canal/DM para o usuário');
+};
+
+module.exports = { scheduleNotifications, runNotificationJob, buildAlertPayload, sendAlertsToManager };

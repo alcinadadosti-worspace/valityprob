@@ -3,10 +3,13 @@ const router = express.Router();
 const { addProduct } = require('../storage/csvStore');
 const { isValidDateString } = require('../utils/dates');
 const { listProducts } = require('../storage/csvStore');
-const { runNotificationJob } = require('../scheduler/notify');
+const { runNotificationJob, sendAlertsToManager } = require('../scheduler/notify');
+const { parseDate, daysUntil } = require('../utils/dates');
 const slackAppModule = require('../slack/app');
 
-router.use(express.urlencoded({ extended: true }));
+// Apply body parsing only where needed to avoid interfering with
+// Slack's signature verification on the `/slack/events` endpoint
+// (ExpressReceiver expects the raw body for verification).
 
 // Página com Formulário
 router.get('/', (req, res) => {
@@ -84,7 +87,7 @@ router.get('/', (req, res) => {
 });
 
 // Processar POST
-router.post('/add', (req, res) => {
+router.post('/add', express.urlencoded({ extended: true }), (req, res) => {
   const { sku, nome, validade, managerId } = req.body;
 
   if (!sku || !nome || !validade || !managerId) {
@@ -202,47 +205,31 @@ router.post('/admin/notify', async (req, res) => {
 });
 
 // Envia mensagem de teste para um usuário (body: { user: 'U0...' })
-router.post('/admin/test', async (req, res) => {
+router.post('/admin/test', express.json(), async (req, res) => {
   const { app } = slackAppModule;
   const user = (req.body && req.body.user) || req.query.user || 'U0895CZ8HU7';
 
   if (!app) return res.status(400).json({ ok: false, message: 'Slack App não configurado.' });
 
-  const testText = `Teste de notificação (envio manual) para ${user} — ignore.`;
   try {
-    try {
-      await app.client.chat.postMessage({ channel: user, text: testText });
-      return res.json({ ok: true, message: `Mensagem enviada diretamente para ${user}` });
-    } catch (postErr) {
-      // fallback para conversations.open se disponível
-      if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
-        const conv = await app.client.conversations.open({ users: user });
-        const channelId = conv && conv.channel && conv.channel.id;
-        if (channelId) {
-          await app.client.chat.postMessage({ channel: channelId, text: testText });
-          return res.json({ ok: true, message: `Mensagem enviada via conversations.open para ${user}` });
-        }
-      }
+    // Seleciona produtos que para o gerente que vencem em 7 dias
+    const products = listProducts();
+    const items = products.filter(p => {
+      const expiryDate = parseDate(p.VALIDADE);
+      return daysUntil(expiryDate) === 7 && p.MANAGER_ID === user;
+    });
 
-      // Tentar im.open (legacy) se disponível e se conversations.open não existir
-      if (app.client && app.client.im && typeof app.client.im.open === 'function') {
-        try {
-          const conv2 = await app.client.im.open({ user });
-          const channelId2 = conv2 && conv2.channel && conv2.channel.id;
-          if (channelId2) {
-            await app.client.chat.postMessage({ channel: channelId2, text: testText });
-            return res.json({ ok: true, message: `Mensagem enviada via im.open para ${user}` });
-          }
-        } catch (imErr) {
-          console.error('im.open falhou:', imErr && (imErr.data && imErr.data.error) || imErr.message || imErr);
-        }
-      }
-
-      console.error('Erro ao enviar teste:', postErr && (postErr.data && postErr.data.error) || postErr.message || postErr);
-      return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
+    if (items.length === 0) {
+      // Se não houver itens, envia uma mensagem de preview com um exemplo
+      const example = [{ SKU: '0000', NOME: 'Exemplo Produto', VALIDADE: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10) }];
+      await sendAlertsToManager(app, user, example);
+      return res.json({ ok: true, message: 'Preview enviado (exemplo) — não havia itens com 7 dias para esse gerente.' });
     }
+
+    await sendAlertsToManager(app, user, items);
+    return res.json({ ok: true, message: `Mensagem de alerta enviada para ${user} com ${items.length} item(ns).` });
   } catch (err) {
-    console.error('Erro inesperado ao enviar teste:', err);
-    res.status(500).json({ ok: false, message: 'Erro inesperado ao enviar teste.' });
+    console.error('Erro ao enviar teste:', err && (err.data && err.data.error) || err.message || err);
+    return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
   }
 });
