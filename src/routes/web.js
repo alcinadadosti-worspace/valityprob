@@ -141,7 +141,12 @@ router.get('/admin', (req, res) => {
       </head>
       <body>
         <h2>Produtos cadastrados</h2>
-        <p><button id="trigger">Disparar notificações agora</button></p>
+        <p>
+          <button id="trigger">Disparar notificações agora</button>
+          &nbsp;
+          <input id="testUser" placeholder="U0895CZ8HU7" value="U0895CZ8HU7" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;margin-left:8px">
+          <button id="testBtn" style="margin-left:6px;padding:6px 10px;background:#0f6f4f;color:#fff;border:none;border-radius:6px;cursor:pointer">Enviar teste</button>
+        </p>
         <table>
           <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Manager ID</th></tr></thead>
           <tbody>
@@ -150,15 +155,27 @@ router.get('/admin', (req, res) => {
         </table>
         <div id="resp" style="margin-top:12px"></div>
         <script>
+          const respEl = document.getElementById('resp');
           document.getElementById('trigger').addEventListener('click', async () => {
-            const resp = document.getElementById('resp');
-            resp.textContent = 'Executando...';
+            respEl.textContent = 'Executando...';
             try {
               const r = await fetch('/admin/notify', { method: 'POST' });
               const j = await r.json();
-              resp.textContent = j.message || JSON.stringify(j);
+              respEl.textContent = j.message || JSON.stringify(j);
             } catch (err) {
-              resp.textContent = 'Erro: ' + err.message;
+              respEl.textContent = 'Erro: ' + err.message;
+            }
+          });
+
+          document.getElementById('testBtn').addEventListener('click', async () => {
+            const user = document.getElementById('testUser').value.trim() || 'U0895CZ8HU7';
+            respEl.textContent = 'Enviando teste para ' + user + '...';
+            try {
+              const r = await fetch('/admin/test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user }) });
+              const j = await r.json();
+              respEl.textContent = j.message || JSON.stringify(j);
+            } catch (err) {
+              respEl.textContent = 'Erro: ' + err.message;
             }
           });
         </script>
@@ -181,5 +198,36 @@ router.post('/admin/notify', async (req, res) => {
   } catch (err) {
     console.error('Erro ao executar job manualmente:', err);
     res.status(500).json({ ok: false, message: 'Erro ao executar job.' });
+  }
+});
+
+// Envia mensagem de teste para um usuário (body: { user: 'U0...' })
+router.post('/admin/test', async (req, res) => {
+  const { app } = slackAppModule;
+  const user = (req.body && req.body.user) || req.query.user || 'U0895CZ8HU7';
+
+  if (!app) return res.status(400).json({ ok: false, message: 'Slack App não configurado.' });
+
+  const testText = `Teste de notificação (envio manual) para ${user} — ignore.`;
+  try {
+    try {
+      await app.client.chat.postMessage({ channel: user, text: testText });
+      return res.json({ ok: true, message: `Mensagem enviada diretamente para ${user}` });
+    } catch (postErr) {
+      // fallback para conversations.open se disponível
+      if (app.client && app.client.conversations && typeof app.client.conversations.open === 'function') {
+        const conv = await app.client.conversations.open({ users: user });
+        const channelId = conv && conv.channel && conv.channel.id;
+        if (channelId) {
+          await app.client.chat.postMessage({ channel: channelId, text: testText });
+          return res.json({ ok: true, message: `Mensagem enviada via conversations.open para ${user}` });
+        }
+      }
+      console.error('Erro ao enviar teste:', postErr && (postErr.data && postErr.data.error) || postErr.message || postErr);
+      return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
+    }
+  } catch (err) {
+    console.error('Erro inesperado ao enviar teste:', err);
+    res.status(500).json({ ok: false, message: 'Erro inesperado ao enviar teste.' });
   }
 });
