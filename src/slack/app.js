@@ -91,17 +91,30 @@ if (hasValidToken) {
   app.action(/^trocar_/, async ({ body, ack, client, action }) => {
     await ack();
 
+    console.log('=== BOTÃO TROCAR CLICADO ===');
+    console.log('User ID:', body.user?.id);
+    console.log('Action:', action.action_id);
+    console.log('Value:', action.value);
+
     try {
       const { sku, unidade } = JSON.parse(action.value);
       const userId = body.user.id;
-      const userName = body.user.name || body.user.username || userId;
+
+      // Busca o nome real do usuário via API do Slack
+      let userName = userId;
+      try {
+        const userInfo = await client.users.info({ user: userId });
+        userName = userInfo.user?.real_name || userInfo.user?.name || userId;
+        console.log('Nome do usuário obtido:', userName);
+      } catch (userErr) {
+        console.warn('Não foi possível obter nome do usuário:', userErr.message);
+      }
 
       // Extrai o nome do produto do block text
       let produtoNome = '';
-      const blocks = body.message.blocks || [];
+      const blocks = body.message?.blocks || [];
       for (const block of blocks) {
         if (block.accessory && block.accessory.action_id === `trocar_${sku}`) {
-          // O texto está no formato "*Nome do Produto*\nSKU: xxx | Vence em: xxx"
           const text = block.text?.text || '';
           const match = text.match(/^\*(.+?)\*/);
           if (match) produtoNome = match[1];
@@ -109,34 +122,50 @@ if (hasValidToken) {
         }
       }
 
+      console.log('Dados extraídos - SKU:', sku, 'Produto:', produtoNome, 'Unidade:', unidade);
+
       // Verifica se já foi trocado
       const existing = await getExchange(sku, unidade);
       if (existing) {
+        console.log('Produto já foi trocado por:', existing.userName);
         // Já foi trocado - apenas atualiza a mensagem
-        await client.chat.update({
-          channel: body.channel.id,
-          ts: body.message.ts,
-          text: body.message.text,
-          blocks: updateBlocksWithConfirmation(body.message.blocks, sku, existing.userName, existing.clickedAt)
-        });
+        try {
+          await client.chat.update({
+            channel: body.channel.id,
+            ts: body.message.ts,
+            text: body.message.text,
+            blocks: updateBlocksWithConfirmation(body.message.blocks, sku, existing.userName, existing.clickedAt)
+          });
+        } catch (updateErr) {
+          console.error('Erro ao atualizar mensagem (já trocado):', updateErr.message);
+        }
         return;
       }
 
       // Salva o exchange com o nome do produto
+      console.log('Salvando exchange no banco...');
       await addExchange({ sku, produtoNome, userId, userName, unidade });
+      console.log('Exchange salvo com sucesso!');
 
       // Atualiza a mensagem original
-      await client.chat.update({
-        channel: body.channel.id,
-        ts: body.message.ts,
-        text: body.message.text,
-        blocks: updateBlocksWithConfirmation(body.message.blocks, sku, userName)
-      });
+      try {
+        await client.chat.update({
+          channel: body.channel.id,
+          ts: body.message.ts,
+          text: body.message.text,
+          blocks: updateBlocksWithConfirmation(body.message.blocks, sku, userName)
+        });
+        console.log('Mensagem atualizada com sucesso!');
+      } catch (updateErr) {
+        console.error('Erro ao atualizar mensagem:', updateErr.message);
+        // Mesmo se falhar a atualização da mensagem, o exchange já foi salvo
+      }
 
-      console.log(`Exchange registrado: SKU ${sku}, Produto ${produtoNome}, Unidade ${unidade}, User ${userName}`);
+      console.log(`✅ Exchange registrado: SKU ${sku}, Produto ${produtoNome}, Unidade ${unidade}, User ${userName}`);
 
     } catch (error) {
-      console.error('Erro ao processar botão Trocar:', error);
+      console.error('❌ Erro ao processar botão Trocar:', error);
+      console.error('Stack:', error.stack);
     }
   });
 }
