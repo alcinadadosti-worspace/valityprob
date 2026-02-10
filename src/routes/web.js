@@ -427,13 +427,14 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
 
   const exchangeRows = exchanges.map(e => {
     const unit = getUnitById(e.unidade);
+    const options = { timeZone: 'America/Maceio', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
     return `
     <tr>
       <td>${e.sku}</td>
       <td>${e.produtoNome || '-'}</td>
       <td>${unit ? unit.name : e.unidade}</td>
       <td>${e.userName}</td>
-      <td>${new Date(e.clickedAt).toLocaleString('pt-BR')}</td>
+      <td>${new Date(e.clickedAt).toLocaleString('pt-BR', options)}</td>
     </tr>
   `;
   }).join('');

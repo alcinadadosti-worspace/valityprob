@@ -85,7 +85,6 @@ if (hasValidToken) {
 
   // --- Handler do botão "Trocar" ---
   app.action(/^trocar_/, async ({ body, ack, client, action }) => {
-    // IMPORTANTE: ack() deve ser chamado PRIMEIRO e imediatamente
     console.log('>>> Botão Trocar recebido, fazendo ack...');
     await ack();
     console.log('>>> ack() concluído');
@@ -94,12 +93,6 @@ if (hasValidToken) {
     processExchange(body, client, action).catch(err => {
       console.error('Erro no processamento do exchange:', err);
     });
-  });
-
-  // Handler para o botão "Ver todos os itens" (não precisa fazer nada, é um link)
-  app.action(/.*/, async ({ ack, action }) => {
-    console.log('>>> Outro action recebido:', action.action_id);
-    await ack();
   });
 }
 
@@ -183,7 +176,8 @@ async function processExchange(body, client, action) {
 
 // Atualiza os blocks para mostrar confirmação
 function updateBlocksWithConfirmation(blocks, sku, userName, clickedAt) {
-  const timestamp = clickedAt ? new Date(clickedAt).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
+  const options = { timeZone: 'America/Maceio', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const timestamp = clickedAt ? new Date(clickedAt).toLocaleString('pt-BR', options) : new Date().toLocaleString('pt-BR', options);
 
   return blocks.map(block => {
     if (block.type === 'section' && block.accessory && block.accessory.action_id === `trocar_${sku}`) {
