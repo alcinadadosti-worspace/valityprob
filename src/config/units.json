@@ -1,0 +1,60 @@
+{
+  "testMode": true,
+  "testUserId": "U0895CZ8HU7",
+  "units": [
+    {
+      "id": "vd-palmeira",
+      "name": "VD Palmeira dos Indios",
+      "members": [
+        { "name": "Jonathan", "slackId": "U07L4D3EWJW" },
+        { "name": "Yasmin Rocha", "slackId": "U08F8T8SMNE" },
+        { "name": "Luan", "slackId": "U087M32A18B" }
+      ]
+    },
+    {
+      "id": "vd-penedo",
+      "name": "VD Penedo",
+      "members": [
+        { "name": "Ana Clara", "slackId": "U08F9KK0AAG" },
+        { "name": "David Silva", "slackId": "U08NERQKFD4" }
+      ]
+    },
+    {
+      "id": "loja-palmeira",
+      "name": "Loja Palmeira dos Indios",
+      "members": [
+        { "name": "Roberia", "slackId": "U08B1MQJL3C" }
+      ]
+    },
+    {
+      "id": "loja-sao-sebastiao",
+      "name": "Loja Sao Sebastiao",
+      "members": [
+        { "name": "Maryanna Trajano", "slackId": "U09ED214T6W" },
+        { "name": "Kemilly", "slackId": "U087HDEARA9" }
+      ]
+    },
+    {
+      "id": "loja-teotonio-vilela",
+      "name": "Loja Teotonio Vilela",
+      "members": [
+        { "name": "Eliene", "slackId": "U087P8JF97F" }
+      ]
+    },
+    {
+      "id": "loja-coruripe",
+      "name": "Loja Coruripe",
+      "members": [
+        { "name": "Bruna Rayana", "slackId": "U08NLNHF29G" },
+        { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" }
+      ]
+    },
+    {
+      "id": "loja-penedo",
+      "name": "Loja Penedo",
+      "members": [
+        { "name": "Deise Gislane", "slackId": "U092FQKNFPB" }
+      ]
+    }
+  ]
+}

@@ -86,14 +86,14 @@
   }
 
   function markErrors(){
-    ['sku','nome','validade','managerId'].forEach(id => {
+    ['sku','nome','validade','unidade'].forEach(id => {
       const el = document.getElementById(id);
       if (el && !el.value) el.classList.add('input-error');
     });
   }
 
   function clearErrors(){
-    ['sku','nome','validade','managerId'].forEach(id => {
+    ['sku','nome','validade','unidade'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('input-error');
     });
