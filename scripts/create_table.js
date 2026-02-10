@@ -12,12 +12,18 @@ const createExchangesTable = `
 CREATE TABLE IF NOT EXISTS exchanges (
   id SERIAL PRIMARY KEY,
   sku TEXT NOT NULL,
+  produto_nome TEXT,
   user_id TEXT NOT NULL,
   user_name TEXT NOT NULL,
   unidade TEXT NOT NULL,
   clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (sku, unidade)
 );`;
+
+// Migration: adiciona coluna produto_nome se não existir
+const addProdutoNomeColumn = `
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS produto_nome TEXT;
+`;
 
 // Migration: adiciona coluna unidade se não existir (para bancos existentes)
 const addUnidadeColumn = `
@@ -62,6 +68,14 @@ ALTER TABLE products DROP COLUMN IF EXISTS manager_id;
     // Cria tabela exchanges
     await pool.query(createExchangesTable);
     console.log('Tabela `exchanges` criada/confirmada com sucesso.');
+
+    // Migration: adiciona coluna produto_nome se não existir
+    try {
+      await pool.query(addProdutoNomeColumn);
+      console.log('Coluna `produto_nome` adicionada em exchanges (ou já existia).');
+    } catch (err) {
+      // Ignora erro se coluna já existe
+    }
 
   } catch (err) {
     console.error('Erro ao criar tabelas:', err.message || err);

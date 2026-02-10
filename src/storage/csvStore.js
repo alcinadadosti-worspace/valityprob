@@ -26,7 +26,7 @@ const ensureProductsFile = () => {
 const ensureExchangesFile = () => {
   ensureDir();
   if (!fs.existsSync(EXCHANGES_FILE)) {
-    const columns = ['SKU', 'USER_ID', 'USER_NAME', 'UNIDADE', 'CLICKED_AT'];
+    const columns = ['SKU', 'PRODUTO_NOME', 'USER_ID', 'USER_NAME', 'UNIDADE', 'CLICKED_AT'];
     fs.writeFileSync(EXCHANGES_FILE, columns.join(',') + '\n');
   }
 };
@@ -96,6 +96,7 @@ const listExchanges = () => {
   ensureExchangesFile();
   return readCsv(EXCHANGES_FILE).map(e => ({
     sku: e.SKU,
+    produtoNome: e.PRODUTO_NOME,
     userId: e.USER_ID,
     userName: e.USER_NAME,
     unidade: e.UNIDADE,
@@ -108,7 +109,7 @@ const listExchangesByUnit = (unidade) => {
   return exchanges.filter(e => e.unidade === unidade);
 };
 
-const addExchange = ({ sku, userId, userName, unidade }) => {
+const addExchange = ({ sku, produtoNome, userId, userName, unidade }) => {
   ensureExchangesFile();
   let exchanges = readCsv(EXCHANGES_FILE);
 
@@ -118,6 +119,7 @@ const addExchange = ({ sku, userId, userName, unidade }) => {
   // Adiciona novo exchange
   exchanges.push({
     SKU: sku,
+    PRODUTO_NOME: produtoNome,
     USER_ID: userId,
     USER_NAME: userName,
     UNIDADE: unidade,
@@ -126,7 +128,7 @@ const addExchange = ({ sku, userId, userName, unidade }) => {
 
   const output = stringify(exchanges, {
     header: true,
-    columns: ['SKU', 'USER_ID', 'USER_NAME', 'UNIDADE', 'CLICKED_AT']
+    columns: ['SKU', 'PRODUTO_NOME', 'USER_ID', 'USER_NAME', 'UNIDADE', 'CLICKED_AT']
   });
 
   fs.writeFileSync(EXCHANGES_FILE, output);

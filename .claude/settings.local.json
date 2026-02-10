@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(units\\): add unit-based notifications with exchange tracking\n\n- Replace manager-based system with unit-based organization\n- Add units.json config with all store locations and members\n- Add \"Trocar\" button to notifications that stops alerts for that item\n- Store exchange clicks in new exchanges table/file\n- Filter /items view by unit\n- Update form to select unit instead of manager\n- Send notifications to ALL members of a unit\n- Add exchanges tracking view in admin panel\n\nUnits configured:\n- VD Palmeira dos Indios \\(3 members\\)\n- VD Penedo \\(2 members\\)\n- Loja Palmeira dos Indios \\(1 member\\)\n- Loja Sao Sebastiao \\(2 members\\)\n- Loja Teotonio Vilela \\(1 member\\)\n- Loja Coruripe \\(2 members\\)\n- Loja Penedo \\(1 member\\)\n\nTest mode enabled with user U0895CZ8HU7\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(set \"DATABASE_URL=postgresql://neondb_owner:npg_aXNl93tJbQIR@ep-lively-butterfly-afnwh1gv-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\")",
+      "Bash(node scripts/create_table.js:*)",
+      "Bash(cmd /c \"set DATABASE_URL=postgresql://neondb_owner:npg_aXNl93tJbQIR@ep-lively-butterfly-afnwh1gv-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require && node scripts/create_table.js\")",
+      "Bash(powershell -Command \"$env:DATABASE_URL=''postgresql://neondb_owner:npg_aXNl93tJbQIR@ep-lively-butterfly-afnwh1gv-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require''; node scripts/create_table.js\")",
+      "Bash(node -e:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

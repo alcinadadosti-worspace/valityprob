@@ -225,6 +225,7 @@ router.get('/admin', async (req, res) => {
     return `
     <tr>
       <td>${e.sku}</td>
+      <td>${e.produtoNome || '-'}</td>
       <td>${unit ? unit.name : e.unidade}</td>
       <td>${e.userName}</td>
       <td>${new Date(e.clickedAt).toLocaleString('pt-BR')}</td>
@@ -281,9 +282,9 @@ router.get('/admin', async (req, res) => {
         <div class="section">
           <h3>Trocas registradas (${exchanges.length})</h3>
           <table>
-            <thead><tr><th>SKU</th><th>Unidade</th><th>Trocado por</th><th>Data/Hora</th></tr></thead>
+            <thead><tr><th>SKU</th><th>Produto</th><th>Unidade</th><th>Trocado por</th><th>Data/Hora</th></tr></thead>
             <tbody>
-              ${exchangeRows || '<tr><td colspan="4">Nenhuma troca registrada</td></tr>'}
+              ${exchangeRows || '<tr><td colspan="5">Nenhuma troca registrada</td></tr>'}
             </tbody>
           </table>
         </div>

@@ -48,12 +48,12 @@ const deleteProduct = async (sku) => {
 
 // ==================== EXCHANGES ====================
 
-const addExchange = async ({ sku, userId, userName, unidade }) => {
+const addExchange = async ({ sku, produtoNome, userId, userName, unidade }) => {
   const pool = getPool();
   await pool.query(
-    `INSERT INTO exchanges (sku, user_id, user_name, unidade) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (sku, unidade) DO UPDATE SET user_id = EXCLUDED.user_id, user_name = EXCLUDED.user_name, clicked_at = CURRENT_TIMESTAMP`,
-    [sku, userId, userName, unidade]
+    `INSERT INTO exchanges (sku, produto_nome, user_id, user_name, unidade) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (sku, unidade) DO UPDATE SET produto_nome = EXCLUDED.produto_nome, user_id = EXCLUDED.user_id, user_name = EXCLUDED.user_name, clicked_at = CURRENT_TIMESTAMP`,
+    [sku, produtoNome, userId, userName, unidade]
   );
   await pool.end();
   return true;
@@ -72,7 +72,7 @@ const hasExchange = async (sku, unidade) => {
 const getExchange = async (sku, unidade) => {
   const pool = getPool();
   const res = await pool.query(
-    `SELECT sku, user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
+    `SELECT sku, produto_nome AS "produtoNome", user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
      FROM exchanges WHERE sku = $1 AND unidade = $2`,
     [sku, unidade]
   );
@@ -83,7 +83,7 @@ const getExchange = async (sku, unidade) => {
 const listExchanges = async () => {
   const pool = getPool();
   const res = await pool.query(
-    `SELECT sku, user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
+    `SELECT sku, produto_nome AS "produtoNome", user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
      FROM exchanges ORDER BY clicked_at DESC`
   );
   await pool.end();
@@ -93,7 +93,7 @@ const listExchanges = async () => {
 const listExchangesByUnit = async (unidade) => {
   const pool = getPool();
   const res = await pool.query(
-    `SELECT sku, user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
+    `SELECT sku, produto_nome AS "produtoNome", user_id AS "userId", user_name AS "userName", unidade, clicked_at AS "clickedAt"
      FROM exchanges WHERE unidade = $1 ORDER BY clicked_at DESC`,
     [unidade]
   );

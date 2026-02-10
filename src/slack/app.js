@@ -96,6 +96,19 @@ if (hasValidToken) {
       const userId = body.user.id;
       const userName = body.user.name || body.user.username || userId;
 
+      // Extrai o nome do produto do block text
+      let produtoNome = '';
+      const blocks = body.message.blocks || [];
+      for (const block of blocks) {
+        if (block.accessory && block.accessory.action_id === `trocar_${sku}`) {
+          // O texto está no formato "*Nome do Produto*\nSKU: xxx | Vence em: xxx"
+          const text = block.text?.text || '';
+          const match = text.match(/^\*(.+?)\*/);
+          if (match) produtoNome = match[1];
+          break;
+        }
+      }
+
       // Verifica se já foi trocado
       const existing = await getExchange(sku, unidade);
       if (existing) {
@@ -109,8 +122,8 @@ if (hasValidToken) {
         return;
       }
 
-      // Salva o exchange
-      await addExchange({ sku, userId, userName, unidade });
+      // Salva o exchange com o nome do produto
+      await addExchange({ sku, produtoNome, userId, userName, unidade });
 
       // Atualiza a mensagem original
       await client.chat.update({
@@ -120,7 +133,7 @@ if (hasValidToken) {
         blocks: updateBlocksWithConfirmation(body.message.blocks, sku, userName)
       });
 
-      console.log(`Exchange registrado: SKU ${sku}, Unidade ${unidade}, User ${userName}`);
+      console.log(`Exchange registrado: SKU ${sku}, Produto ${produtoNome}, Unidade ${unidade}, User ${userName}`);
 
     } catch (error) {
       console.error('Erro ao processar botão Trocar:', error);
