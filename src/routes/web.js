@@ -6,10 +6,39 @@ const { runNotificationJob, sendAlertsToMember, buildAlertPayload } = require('.
 const { getUnitOptions, getUnitById, getAllUnits } = require('../config/unitsHelper');
 const slackAppModule = require('../slack/app');
 
-// Página com Formulário
+// Senha do admin
+const ADMIN_PASSWORD = '333399';
+
+// Helper para parse de cookies
+function parseCookies(req) {
+  const cookies = {};
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    cookieHeader.split(';').forEach(cookie => {
+      const [name, value] = cookie.trim().split('=');
+      cookies[name] = decodeURIComponent(value);
+    });
+  }
+  return cookies;
+}
+
+// Página inicial - Seleção de Unidade
 router.get('/', (req, res) => {
+  const cookies = parseCookies(req);
+  const savedUnit = cookies.unidade;
+
+  // Se já tem unidade salva, redireciona para o cadastro
+  if (savedUnit && getUnitById(savedUnit)) {
+    return res.redirect('/cadastro');
+  }
+
   const unitOptions = getUnitOptions();
-  const unitOptionsHtml = unitOptions.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  const unitCardsHtml = unitOptions.map(u => `
+    <a href="/selecionar-unidade?unidade=${u.id}" class="unit-card">
+      <div class="unit-icon">🏪</div>
+      <div class="unit-name">${u.name}</div>
+    </a>
+  `).join('');
 
   const html = `
   <!DOCTYPE html>
@@ -18,11 +47,124 @@ router.get('/', (req, res) => {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#006837">
-    <title>Cadastro de Demonstrador — O Boticário</title>
+    <title>Selecione sua Unidade — O Boticário</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20fill='%23006837'%20rx='12'%20width='100%25'%20height='100%25'/%3E%3Ctext%20x='50%25'%20y='55%25'%20font-family='Inter,Arial'%20font-size='28'%20fill='white'%20text-anchor='middle'%3EOB%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/public/style.css">
+    <style>
+      .unit-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+      .unit-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 16px;
+        background: #fff;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s ease;
+      }
+      .unit-card:hover {
+        border-color: #006837;
+        background: #f0fdf4;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,104,55,0.15);
+      }
+      .unit-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+      .unit-name {
+        font-weight: 600;
+        text-align: center;
+        font-size: 14px;
+      }
+      .welcome-text {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+      .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header" style="text-align:center">
+        <div class="logo" aria-hidden="true" style="margin:0 auto 16px">
+          <img src="/public/logo.png" alt="Logo da empresa" class="logo-img">
+        </div>
+        <h1 class="welcome-text">Bem-vindo!</h1>
+        <p class="subtitle">Selecione sua unidade para continuar</p>
+      </div>
+
+      <div class="card">
+        <div class="unit-grid">
+          ${unitCardsHtml}
+        </div>
+      </div>
+
+      <p style="text-align:center;margin-top:24px;font-size:13px;color:#888">
+        <a href="/admin-login" style="color:#666;text-decoration:none">Área administrativa</a>
+      </p>
+    </div>
+  </body>
+  </html>
+  `;
+  res.send(html);
+});
+
+// Selecionar unidade e salvar cookie
+router.get('/selecionar-unidade', (req, res) => {
+  const { unidade } = req.query;
+
+  if (!unidade || !getUnitById(unidade)) {
+    return res.redirect('/');
+  }
+
+  // Salva cookie por 30 dias
+  res.setHeader('Set-Cookie', `unidade=${encodeURIComponent(unidade)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; SameSite=Lax`);
+  res.redirect('/cadastro');
+});
+
+// Trocar unidade
+router.get('/trocar-unidade', (req, res) => {
+  // Remove o cookie
+  res.setHeader('Set-Cookie', 'unidade=; Path=/; Max-Age=0');
+  res.redirect('/');
+});
+
+// Página de Cadastro (precisa ter unidade selecionada)
+router.get('/cadastro', (req, res) => {
+  const cookies = parseCookies(req);
+  const unidade = cookies.unidade;
+
+  if (!unidade || !getUnitById(unidade)) {
+    return res.redirect('/');
+  }
+
+  const unit = getUnitById(unidade);
+
+  const html = `
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#006837">
+    <title>Cadastro de Demonstrador — ${unit.name}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
   </head>
   <body>
@@ -33,13 +175,14 @@ router.get('/', (req, res) => {
         </div>
         <div>
             <h1>Cadastro de Demonstrador</h1>
-            <p class="lead">Adicione produtos e informe a unidade para receber notificações no Slack.</p>
-            <p style="margin-top:8px"><a href="/items" style="color:#006837;font-weight:600;text-decoration:none">Ver todos os itens cadastrados</a> &nbsp;·&nbsp; <a href="/admin" style="color:#006837;text-decoration:none">Área administrativa</a></p>
+            <p class="lead">Unidade: <strong>${unit.name}</strong> · <a href="/trocar-unidade" style="color:#006837;font-size:13px">Trocar unidade</a></p>
+            <p style="margin-top:8px"><a href="/items?unidade=${unidade}" style="color:#006837;font-weight:600;text-decoration:none">Ver itens da minha unidade</a></p>
         </div>
       </div>
 
       <div class="card">
         <form id="productForm" aria-describedby="formHelp">
+          <input type="hidden" id="unidade" name="unidade" value="${unidade}">
           <fieldset style="border:0;padding:0;margin:0;">
             <legend class="full" style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:8px">Cadastrar Demonstrador</legend>
 
@@ -53,21 +196,9 @@ router.get('/', (req, res) => {
               <input id="nome" name="nome" required placeholder="Ex: Batom Vermelho" aria-required="true">
             </div>
 
-            <div class="field">
+            <div class="field full">
               <label for="validade">Validade</label>
               <input id="validade" name="validade" type="date" required aria-required="true">
-            </div>
-
-            <div class="field">
-              <label for="unidade">Unidade</label>
-              <select id="unidade" name="unidade" required aria-required="true">
-                <option value="">-- selecione a unidade --</option>
-                ${unitOptionsHtml}
-              </select>
-            </div>
-
-            <div class="full">
-              <p id="formHelp" class="note">Selecione a unidade onde o demonstrador está localizado.</p>
             </div>
 
             <div class="full actions">
@@ -88,7 +219,7 @@ router.get('/', (req, res) => {
   res.send(html);
 });
 
-// Processar POST
+// Processar POST de cadastro
 router.post('/add', express.urlencoded({ extended: true }), async (req, res) => {
   const { sku, nome, validade, unidade } = req.body;
 
@@ -96,17 +227,16 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.status(400).json({ ok: false, message: 'Preencha todos os campos.' });
     }
-    return res.status(400).send('<h3 class="error">Preencha todos os campos. <a href="/">Voltar</a></h3>');
+    return res.status(400).send('<h3 class="error">Preencha todos os campos. <a href="/cadastro">Voltar</a></h3>');
   }
 
   if (!isValidDateString(validade)) {
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.status(400).json({ ok: false, message: 'Data inválida.' });
     }
-    return res.status(400).send('<h3 class="error">Data inválida. <a href="/">Voltar</a></h3>');
+    return res.status(400).send('<h3 class="error">Data inválida. <a href="/cadastro">Voltar</a></h3>');
   }
 
-  // Valida unidade
   const unit = getUnitById(unidade);
   if (!unit) {
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
@@ -120,7 +250,7 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.json({ ok: true, message: 'Produto cadastrado com sucesso!' });
     }
-    res.send('<h3 class="success">Produto cadastrado com sucesso! <a href="/">Cadastrar outro</a></h3>');
+    res.send('<h3 class="success">Produto cadastrado com sucesso! <a href="/cadastro">Cadastrar outro</a></h3>');
   } catch (err) {
     console.error(err);
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
@@ -130,21 +260,26 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
   }
 });
 
-// Lista pública de itens cadastrados com filtro por unidade
+// Lista de itens com filtro por unidade
 router.get('/items', async (req, res) => {
+  const cookies = parseCookies(req);
+  const unidadeFromCookie = cookies.unidade;
   const { unidade } = req.query;
+
+  // Se não tem unidade na query, usa a do cookie
+  const selectedUnidade = unidade || unidadeFromCookie;
   const unitOptions = getUnitOptions();
 
   let products;
-  if (unidade) {
-    products = await listProductsByUnit(unidade);
+  if (selectedUnidade) {
+    products = await listProductsByUnit(selectedUnidade);
   } else {
     products = await listProducts();
   }
 
-  const selectedUnit = unidade ? getUnitById(unidade) : null;
+  const selectedUnit = selectedUnidade ? getUnitById(selectedUnidade) : null;
   const unitOptionsHtml = unitOptions.map(u =>
-    `<option value="${u.id}" ${unidade === u.id ? 'selected' : ''}>${u.name}</option>`
+    `<option value="${u.id}" ${selectedUnidade === u.id ? 'selected' : ''}>${u.name}</option>`
   ).join('');
 
   const rows = products.map(p => {
@@ -178,7 +313,7 @@ router.get('/items', async (req, res) => {
       </style>
     </head>
     <body>
-      <a href="/" style="display:inline-block;margin-bottom:12px;color:#006837;text-decoration:none">← Voltar ao cadastro</a>
+      <a href="/cadastro" style="display:inline-block;margin-bottom:12px;color:#006837;text-decoration:none">← Voltar ao cadastro</a>
       <h2>Itens Cadastrados (${products.length})${selectedUnit ? ` — ${selectedUnit.name}` : ''}</h2>
 
       <div class="filter-bar">
@@ -187,7 +322,7 @@ router.get('/items', async (req, res) => {
           <option value="">Todas as unidades</option>
           ${unitOptionsHtml}
         </select>
-        ${unidade ? '<a href="/items">Limpar filtro</a>' : ''}
+        ${selectedUnidade ? '<a href="/items?unidade=">Limpar filtro</a>' : ''}
       </div>
 
       <table>
@@ -203,8 +338,78 @@ router.get('/items', async (req, res) => {
   res.send(html);
 });
 
-// Rota administrativa
-router.get('/admin', async (req, res) => {
+// ==================== ÁREA ADMINISTRATIVA ====================
+
+// Tela de login do admin
+router.get('/admin-login', (req, res) => {
+  const { error } = req.query;
+
+  const html = `
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Login — Área Administrativa</title>
+      <link rel="stylesheet" href="/public/style.css">
+      <style>
+        body{font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}
+        .login-box{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);width:100%;max-width:360px}
+        .login-box h2{margin:0 0 24px;text-align:center;color:#006837}
+        .login-box input{width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:16px;margin-bottom:16px;box-sizing:border-box}
+        .login-box button{width:100%;padding:12px;background:#006837;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer}
+        .login-box button:hover{background:#005530}
+        .error-msg{background:#ffebee;color:#c62828;padding:12px;border-radius:6px;margin-bottom:16px;text-align:center;font-size:14px}
+        .back-link{display:block;text-align:center;margin-top:16px;color:#666;text-decoration:none;font-size:14px}
+      </style>
+    </head>
+    <body>
+      <div class="login-box">
+        <h2>Área Administrativa</h2>
+        ${error ? '<div class="error-msg">Senha incorreta</div>' : ''}
+        <form method="POST" action="/admin-login">
+          <input type="password" name="senha" placeholder="Digite a senha" required autofocus>
+          <button type="submit">Entrar</button>
+        </form>
+        <a href="/" class="back-link">← Voltar</a>
+      </div>
+    </body>
+  </html>
+  `;
+  res.send(html);
+});
+
+// Processar login do admin
+router.post('/admin-login', express.urlencoded({ extended: true }), (req, res) => {
+  const { senha } = req.body;
+
+  if (senha === ADMIN_PASSWORD) {
+    // Salva cookie de sessão admin (expira em 8 horas)
+    res.setHeader('Set-Cookie', `admin_session=authenticated; Path=/; Max-Age=${8 * 60 * 60}; SameSite=Lax`);
+    res.redirect('/admin');
+  } else {
+    res.redirect('/admin-login?error=1');
+  }
+});
+
+// Logout do admin
+router.get('/admin-logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'admin_session=; Path=/; Max-Age=0');
+  res.redirect('/admin-login');
+});
+
+// Middleware para verificar autenticação admin
+function requireAdminAuth(req, res, next) {
+  const cookies = parseCookies(req);
+  if (cookies.admin_session === 'authenticated') {
+    next();
+  } else {
+    res.redirect('/admin-login');
+  }
+}
+
+// Rota administrativa (protegida por senha)
+router.get('/admin', requireAdminAuth, async (req, res) => {
   const products = await listProducts();
   const exchanges = await listExchanges();
 
@@ -251,10 +456,16 @@ router.get('/admin', async (req, res) => {
           .section{margin-top:32px}
           .test-box{background:#f5f5f5;padding:16px;border-radius:8px;margin-top:16px}
           .test-box input, .test-box select{padding:6px 8px;border:1px solid #ddd;border-radius:6px;margin-right:8px}
+          .header-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+          .logout-btn{background:#dc3545;padding:6px 12px;font-size:13px}
         </style>
       </head>
       <body>
-        <a href="/" style="display:inline-block;margin-bottom:12px;color:#006837;text-decoration:none">← Voltar</a>
+        <div class="header-bar">
+          <a href="/" style="color:#006837;text-decoration:none">← Voltar ao site</a>
+          <a href="/admin-logout" class="logout-btn" style="background:#dc3545;color:#fff;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:13px">Sair</a>
+        </div>
+
         <h2>Produtos cadastrados (${products.length})</h2>
         <p>
           <button id="trigger">Disparar notificações agora</button>
@@ -334,7 +545,7 @@ router.get('/admin', async (req, res) => {
   res.send(html);
 });
 
-router.post('/admin/notify', async (req, res) => {
+router.post('/admin/notify', requireAdminAuth, async (req, res) => {
   const { app } = slackAppModule;
   if (!app) {
     return res.status(400).json({ ok: false, message: 'Slack App não está configurado (cheque variáveis de ambiente).' });
@@ -349,8 +560,7 @@ router.post('/admin/notify', async (req, res) => {
   }
 });
 
-// Envia mensagem de teste para um usuário
-router.post('/admin/test', express.json(), async (req, res) => {
+router.post('/admin/test', requireAdminAuth, express.json(), async (req, res) => {
   const { app } = slackAppModule;
   const user = (req.body && req.body.user) || 'U0895CZ8HU7';
   const unidade = (req.body && req.body.unidade) || 'vd-palmeira';
@@ -358,7 +568,6 @@ router.post('/admin/test', express.json(), async (req, res) => {
   if (!app) return res.status(400).json({ ok: false, message: 'Slack App não configurado.' });
 
   try {
-    // Busca produtos da unidade que vencem em 7 dias
     const products = await listProductsByUnit(unidade);
     const items = products.filter(p => {
       const expiryDate = parseDate(p.VALIDADE);
@@ -366,7 +575,6 @@ router.post('/admin/test', express.json(), async (req, res) => {
     });
 
     if (items.length === 0) {
-      // Se não houver itens, envia uma mensagem de preview com um exemplo
       const example = [{
         SKU: '0000',
         NOME: 'Exemplo Produto',
