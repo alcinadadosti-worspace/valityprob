@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog } = require('../storage');
+const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog, deleteProduct } = require('../storage');
 const { isValidDateString, parseDate, daysUntil } = require('../utils/dates');
 const { runNotificationJob, sendAlertsToMember, buildAlertPayload } = require('../scheduler/notify');
 const { getUnitOptions, getUnitById, getAllUnits } = require('../config/unitsHelper');
@@ -292,11 +292,12 @@ router.get('/items', async (req, res) => {
   const rows = products.map(p => {
     const unit = getUnitById(p.UNIDADE);
     return `
-    <tr>
+    <tr data-sku="${p.SKU}">
       <td>${p.SKU}</td>
       <td>${p.NOME}</td>
       <td>${p.VALIDADE}</td>
       <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
+      <td><button class="btn-delete" onclick="deleteProduct('${p.SKU}', this)">Excluir</button></td>
     </tr>
   `;
   }).join('');
@@ -317,6 +318,11 @@ router.get('/items', async (req, res) => {
         .filter-bar{margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
         .filter-bar select{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px}
         .filter-bar a{color:#006837;text-decoration:none;font-size:14px}
+        .btn-delete{background:#dc3545;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:13px}
+        .btn-delete:hover{background:#c82333}
+        .btn-delete:disabled{background:#ccc;cursor:not-allowed}
+        .toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:12px 20px;border-radius:6px;display:none}
+        .toast.show{display:block}
       </style>
     </head>
     <body>
@@ -333,11 +339,50 @@ router.get('/items', async (req, res) => {
       </div>
 
       <table>
-        <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Unidade</th></tr></thead>
+        <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Unidade</th><th>Ações</th></tr></thead>
         <tbody>
-          ${rows || '<tr><td colspan="4" style="text-align:center;color:#666">Nenhum item cadastrado</td></tr>'}
+          ${rows || '<tr><td colspan="5" style="text-align:center;color:#666">Nenhum item cadastrado</td></tr>'}
         </tbody>
       </table>
+
+      <div id="toast" class="toast"></div>
+
+      <script>
+        function showToast(msg) {
+          const toast = document.getElementById('toast');
+          toast.textContent = msg;
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        async function deleteProduct(sku, btn) {
+          if (!confirm('Tem certeza que deseja excluir este item?')) return;
+
+          btn.disabled = true;
+          btn.textContent = 'Excluindo...';
+
+          try {
+            const res = await fetch('/api/products/' + encodeURIComponent(sku), { method: 'DELETE' });
+            const data = await res.json();
+
+            if (data.ok) {
+              const row = btn.closest('tr');
+              row.style.transition = 'opacity 0.3s';
+              row.style.opacity = '0';
+              setTimeout(() => row.remove(), 300);
+              showToast('Item excluído com sucesso!');
+            } else {
+              showToast('Erro: ' + data.message);
+              btn.disabled = false;
+              btn.textContent = 'Excluir';
+            }
+          } catch (err) {
+            showToast('Erro ao excluir item');
+            btn.disabled = false;
+            btn.textContent = 'Excluir';
+          }
+        }
+      </script>
     </body>
   </html>
   `;
@@ -355,6 +400,21 @@ router.get('/api/catalog/:sku', (req, res) => {
     res.json({ found: true, nome: product.nome });
   } else {
     res.json({ found: false });
+  }
+});
+
+// ==================== API DE PRODUTOS ====================
+
+// Deletar produto (demonstrador)
+router.delete('/api/products/:sku', async (req, res) => {
+  const { sku } = req.params;
+
+  try {
+    await deleteProduct(sku);
+    res.json({ ok: true, message: 'Produto excluído com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao excluir produto:', err);
+    res.status(500).json({ ok: false, message: 'Erro ao excluir produto.' });
   }
 });
 
