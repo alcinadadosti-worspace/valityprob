@@ -35,7 +35,12 @@ router.get('/', (req, res) => {
   const unitOptions = getUnitOptions();
   const unitCardsHtml = unitOptions.map(u => `
     <a href="/selecionar-unidade?unidade=${u.id}" class="unit-card">
-      <div class="unit-icon">🏪</div>
+      <div class="unit-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </div>
       <div class="unit-name">${u.name}</div>
     </a>
   `).join('');
@@ -47,74 +52,34 @@ router.get('/', (req, res) => {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#006837">
-    <title>Selecione sua Unidade — O Boticário</title>
+    <title>Selecione sua Unidade</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
-    <style>
-      .unit-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 16px;
-        margin-top: 24px;
-      }
-      .unit-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 24px 16px;
-        background: #fff;
-        border: 2px solid #e0e0e0;
-        border-radius: 12px;
-        text-decoration: none;
-        color: #333;
-        transition: all 0.2s ease;
-      }
-      .unit-card:hover {
-        border-color: #006837;
-        background: #f0fdf4;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,104,55,0.15);
-      }
-      .unit-icon {
-        font-size: 48px;
-        margin-bottom: 12px;
-      }
-      .unit-name {
-        font-weight: 600;
-        text-align: center;
-        font-size: 14px;
-      }
-      .welcome-text {
-        text-align: center;
-        margin-bottom: 8px;
-      }
-      .subtitle {
-        text-align: center;
-        color: #666;
-        margin-bottom: 24px;
-      }
-    </style>
   </head>
   <body>
-    <div class="container">
-      <div class="header" style="text-align:center">
-        <div class="logo" aria-hidden="true" style="margin:0 auto 16px">
-          <img src="/public/logo.png" alt="Logo da empresa" class="logo-img">
+    <div class="container container--narrow">
+      <div class="header header--centered">
+        <div class="logo">
+          <img src="/public/logo.png" alt="Logo" class="logo-img">
         </div>
-        <h1 class="welcome-text">Bem-vindo!</h1>
-        <p class="subtitle">Selecione sua unidade para continuar</p>
+        <div class="header-content">
+          <h1 class="header-title">Controle de Validade</h1>
+          <p class="header-subtitle">Selecione sua unidade para continuar</p>
+        </div>
       </div>
 
       <div class="card">
-        <div class="unit-grid">
-          ${unitCardsHtml}
+        <div class="card-body">
+          <div class="unit-grid">
+            ${unitCardsHtml}
+          </div>
         </div>
       </div>
 
-      <p style="text-align:center;margin-top:24px;font-size:13px;color:#888">
-        <a href="/admin-login" style="color:#666;text-decoration:none">Área administrativa</a>
+      <p class="text-center text-muted text-small mt-6">
+        <a href="/admin-login" class="header-link" style="opacity:0.6">Acessar painel administrativo</a>
       </p>
     </div>
   </body>
@@ -164,54 +129,79 @@ router.get('/cadastro', (req, res) => {
     <title>Cadastro de Demonstrador — ${unit.name}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
   </head>
   <body>
     <div class="container">
       <div class="header">
-        <div class="logo" aria-hidden="true">
-          <img src="/public/logo.png" alt="Logo da empresa" class="logo-img">
+        <div class="logo">
+          <img src="/public/logo.png" alt="Logo" class="logo-img">
         </div>
-        <div>
-            <h1>Cadastro de Demonstrador</h1>
-            <p class="lead">Unidade: <strong>${unit.name}</strong> · <a href="/trocar-unidade" style="color:#006837;font-size:13px">Trocar unidade</a></p>
-            <p style="margin-top:8px"><a href="/items?unidade=${unidade}" style="color:#006837;font-weight:600;text-decoration:none">Ver itens da minha unidade</a></p>
+        <div class="header-content">
+          <h1 class="header-title">Cadastro de Demonstrador</h1>
+          <p class="header-subtitle">
+            ${unit.name}
+            <span style="margin:0 6px;opacity:0.3">|</span>
+            <a href="/trocar-unidade" class="header-link">Trocar</a>
+          </p>
         </div>
       </div>
 
       <div class="card">
-        <form id="productForm" aria-describedby="formHelp">
-          <input type="hidden" id="unidade" name="unidade" value="${unidade}">
-          <fieldset style="border:0;padding:0;margin:0;">
-            <legend class="full" style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:8px">Cadastrar Demonstrador</legend>
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span class="card-header-title">Novo Cadastro</span>
+          <a href="/items?unidade=${unidade}" class="header-link text-small" style="text-transform:none;letter-spacing:0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Ver itens cadastrados
+          </a>
+        </div>
+        <div class="card-body">
+          <form id="productForm">
+            <input type="hidden" id="unidade" name="unidade" value="${unidade}">
+            <div class="form-grid form-grid--2col">
+              <div class="form-field">
+                <label for="sku" class="form-label">SKU</label>
+                <input id="sku" name="sku" class="form-input" required placeholder="Ex: 123456" inputmode="numeric">
+              </div>
 
-            <div class="field">
-              <label for="sku">SKU</label>
-              <input id="sku" name="sku" required placeholder="Ex: 123456" inputmode="numeric" aria-required="true">
+              <div class="form-field">
+                <label for="nome" class="form-label">Nome / Descricao</label>
+                <input id="nome" name="nome" class="form-input" required placeholder="Ex: Batom Vermelho">
+              </div>
+
+              <div class="form-field form-field--full">
+                <label for="validade" class="form-label">Validade</label>
+                <input id="validade" name="validade" class="form-input" type="date" required>
+              </div>
+
+              <div class="form-field form-field--full">
+                <div class="form-actions">
+                  <button type="button" class="btn btn--secondary" id="resetBtn">Limpar</button>
+                  <button type="submit" class="btn btn--primary" id="submitBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                      <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Salvar
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div class="field">
-              <label for="nome">Nome / Descrição</label>
-              <input id="nome" name="nome" required placeholder="Ex: Batom Vermelho" aria-required="true">
-            </div>
-
-            <div class="field full">
-              <label for="validade">Validade</label>
-              <input id="validade" name="validade" type="date" required aria-required="true">
-            </div>
-
-            <div class="full actions">
-              <button type="button" class="secondary" id="resetBtn">Limpar</button>
-              <button type="submit" id="submitBtn" aria-live="polite">Salvar</button>
-            </div>
-          </fieldset>
-
-          <div id="resp" class="full" role="status" aria-live="polite"></div>
-        </form>
+            <div id="resp" role="status" aria-live="polite"></div>
+          </form>
+        </div>
       </div>
     </div>
 
+    <div id="toast" class="toast"></div>
     <script src="/public/app.js" defer></script>
   </body>
   </html>
@@ -289,7 +279,7 @@ router.get('/items', async (req, res) => {
     `<option value="${u.id}" ${selectedUnidade === u.id ? 'selected' : ''}>${u.name}</option>`
   ).join('');
 
-  const rows = products.map(p => {
+  const rows = products.length > 0 ? products.map(p => {
     const unit = getUnitById(p.UNIDADE);
     return `
     <tr data-sku="${p.SKU}">
@@ -297,53 +287,80 @@ router.get('/items', async (req, res) => {
       <td>${p.NOME}</td>
       <td>${p.VALIDADE}</td>
       <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
-      <td><button class="btn-delete" onclick="deleteProduct('${p.SKU}', this)">Excluir</button></td>
+      <td>
+        <button class="btn btn--danger btn--sm" onclick="deleteProduct('${p.SKU}', this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Excluir
+        </button>
+      </td>
     </tr>
   `;
-  }).join('');
+  }).join('') : '';
 
   const html = `
   <!doctype html>
-  <html>
+  <html lang="pt-BR">
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
+      <meta name="theme-color" content="#006837">
       <title>Itens Cadastrados${selectedUnit ? ` — ${selectedUnit.name}` : ''}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="/public/style.css">
-      <style>
-        body{font-family:Inter,Arial,Helvetica,sans-serif;padding:18px}
-        table{border-collapse:collapse;width:100%}
-        td,th{border:1px solid #e6e6e6;padding:8px}
-        th{background:#f7faf9;text-align:left}
-        .filter-bar{margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-        .filter-bar select{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px}
-        .filter-bar a{color:#006837;text-decoration:none;font-size:14px}
-        .btn-delete{background:#dc3545;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:13px}
-        .btn-delete:hover{background:#c82333}
-        .btn-delete:disabled{background:#ccc;cursor:not-allowed}
-        .toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:12px 20px;border-radius:6px;display:none}
-        .toast.show{display:block}
-      </style>
     </head>
     <body>
-      <a href="/cadastro" style="display:inline-block;margin-bottom:12px;color:#006837;text-decoration:none">← Voltar ao cadastro</a>
-      <h2>Itens Cadastrados (${products.length})${selectedUnit ? ` — ${selectedUnit.name}` : ''}</h2>
+      <nav class="nav-bar">
+        <a href="/cadastro" class="nav-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          Voltar ao cadastro
+        </a>
+      </nav>
 
-      <div class="filter-bar">
-        <label for="unitFilter">Filtrar por unidade:</label>
-        <select id="unitFilter" onchange="window.location.href='/items?unidade='+this.value">
-          <option value="">Todas as unidades</option>
-          ${unitOptionsHtml}
-        </select>
-        ${selectedUnidade ? '<a href="/items?unidade=">Limpar filtro</a>' : ''}
+      <div class="container container--wide">
+        <div class="header">
+          <div class="header-content">
+            <h1 class="header-title">Itens Cadastrados</h1>
+            <p class="header-subtitle">${products.length} ${products.length === 1 ? 'item' : 'itens'}${selectedUnit ? ` em ${selectedUnit.name}` : ''}</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <span class="card-header-title">Lista de Demonstradores</span>
+            <div style="display:flex;gap:12px;align-items:center">
+              <select id="unitFilter" class="form-input" style="width:auto;min-width:180px;padding:8px 12px" onchange="window.location.href='/items?unidade='+this.value">
+                <option value="">Todas as unidades</option>
+                ${unitOptionsHtml}
+              </select>
+              ${selectedUnidade ? '<a href="/items?unidade=" class="header-link text-small">Limpar filtro</a>' : ''}
+            </div>
+          </div>
+          <div class="table-container" style="border:0;border-radius:0">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Nome</th>
+                  <th>Validade</th>
+                  <th>Unidade</th>
+                  <th style="width:120px">Acoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="5" class="table-empty">Nenhum item cadastrado</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-
-      <table>
-        <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Unidade</th><th>Ações</th></tr></thead>
-        <tbody>
-          ${rows || '<tr><td colspan="5" style="text-align:center;color:#666">Nenhum item cadastrado</td></tr>'}
-        </tbody>
-      </table>
 
       <div id="toast" class="toast"></div>
 
@@ -359,7 +376,7 @@ router.get('/items', async (req, res) => {
           if (!confirm('Tem certeza que deseja excluir este item?')) return;
 
           btn.disabled = true;
-          btn.textContent = 'Excluindo...';
+          btn.innerHTML = '<span class="btn-spinner"></span> Excluindo...';
 
           try {
             const res = await fetch('/api/products/' + encodeURIComponent(sku), { method: 'DELETE' });
@@ -367,19 +384,20 @@ router.get('/items', async (req, res) => {
 
             if (data.ok) {
               const row = btn.closest('tr');
-              row.style.transition = 'opacity 0.3s';
+              row.style.transition = 'opacity 0.3s, transform 0.3s';
               row.style.opacity = '0';
+              row.style.transform = 'translateX(10px)';
               setTimeout(() => row.remove(), 300);
-              showToast('Item excluído com sucesso!');
+              showToast('Item excluido com sucesso!');
             } else {
               showToast('Erro: ' + data.message);
               btn.disabled = false;
-              btn.textContent = 'Excluir';
+              btn.innerHTML = 'Excluir';
             }
           } catch (err) {
             showToast('Erro ao excluir item');
             btn.disabled = false;
-            btn.textContent = 'Excluir';
+            btn.innerHTML = 'Excluir';
           }
         }
       </script>
@@ -426,32 +444,50 @@ router.get('/admin-login', (req, res) => {
 
   const html = `
   <!doctype html>
-  <html>
+  <html lang="pt-BR">
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>Login — Área Administrativa</title>
+      <meta name="theme-color" content="#006837">
+      <title>Login — Painel Administrativo</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="/public/style.css">
-      <style>
-        body{font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}
-        .login-box{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);width:100%;max-width:360px}
-        .login-box h2{margin:0 0 24px;text-align:center;color:#006837}
-        .login-box input{width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:16px;margin-bottom:16px;box-sizing:border-box}
-        .login-box button{width:100%;padding:12px;background:#006837;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer}
-        .login-box button:hover{background:#005530}
-        .error-msg{background:#ffebee;color:#c62828;padding:12px;border-radius:6px;margin-bottom:16px;text-align:center;font-size:14px}
-        .back-link{display:block;text-align:center;margin-top:16px;color:#666;text-decoration:none;font-size:14px}
-      </style>
     </head>
-    <body>
+    <body class="login-container">
       <div class="login-box">
-        <h2>Área Administrativa</h2>
-        ${error ? '<div class="error-msg">Senha incorreta</div>' : ''}
-        <form method="POST" action="/admin-login">
-          <input type="password" name="senha" placeholder="Digite a senha" required autofocus>
-          <button type="submit">Entrar</button>
-        </form>
-        <a href="/" class="back-link">← Voltar</a>
+        <div class="card">
+          <div class="card-body">
+            <div class="login-header">
+              <div class="logo">
+                <img src="/public/logo.png" alt="Logo" class="logo-img">
+              </div>
+              <h1 class="login-title">Painel Administrativo</h1>
+              <p class="login-subtitle">Digite a senha para acessar</p>
+            </div>
+
+            ${error ? '<div class="message message--error mb-4">Senha incorreta. Tente novamente.</div>' : ''}
+
+            <form method="POST" action="/admin-login">
+              <div class="form-field mb-4">
+                <label for="senha" class="form-label">Senha</label>
+                <input type="password" id="senha" name="senha" class="form-input" placeholder="Digite sua senha" required autofocus>
+              </div>
+              <button type="submit" class="btn btn--primary" style="width:100%">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Entrar
+              </button>
+            </form>
+
+            <p class="text-center text-muted text-small mt-4">
+              <a href="/" class="header-link">Voltar ao inicio</a>
+            </p>
+          </div>
+        </div>
       </div>
     </body>
   </html>
@@ -493,7 +529,7 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
   const products = await listProducts();
   const exchanges = await listExchanges();
 
-  const productRows = products.map(p => {
+  const productRows = products.length > 0 ? products.map(p => {
     const unit = getUnitById(p.UNIDADE);
     return `
     <tr>
@@ -503,9 +539,9 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
       <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
     </tr>
   `;
-  }).join('');
+  }).join('') : '';
 
-  const exchangeRows = exchanges.map(e => {
+  const exchangeRows = exchanges.length > 0 ? exchanges.map(e => {
     const unit = getUnitById(e.unidade);
     const options = { timeZone: 'America/Maceio', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
     return `
@@ -517,82 +553,150 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
       <td>${new Date(e.clickedAt).toLocaleString('pt-BR', options)}</td>
     </tr>
   `;
-  }).join('');
+  }).join('') : '';
 
   const unitOptions = getAllUnits().map(u => `<option value="${u.id}">${u.name}</option>`).join('');
 
   const html = `
     <!doctype html>
-    <html>
+    <html lang="pt-BR">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Admin — Produtos</title>
-        <style>
-          body{font-family:Arial,Helvetica,sans-serif;padding:20px}
-          table{border-collapse:collapse;width:100%;margin-bottom:24px}
-          td,th{border:1px solid #e6e6e6;padding:8px}
-          th{background:#f7faf9;text-align:left}
-          button{padding:8px 12px;background:#006837;color:#fff;border:none;border-radius:6px;cursor:pointer}
-          .section{margin-top:32px}
-          .test-box{background:#f5f5f5;padding:16px;border-radius:8px;margin-top:16px}
-          .test-box input, .test-box select{padding:6px 8px;border:1px solid #ddd;border-radius:6px;margin-right:8px}
-          .header-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-          .logout-btn{background:#dc3545;padding:6px 12px;font-size:13px}
-        </style>
+        <meta name="theme-color" content="#006837">
+        <title>Painel Administrativo</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/public/style.css">
       </head>
       <body>
-        <div class="header-bar">
-          <a href="/" style="color:#006837;text-decoration:none">← Voltar ao site</a>
-          <a href="/admin-logout" class="logout-btn" style="background:#dc3545;color:#fff;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:13px">Sair</a>
+        <nav class="nav-bar">
+          <a href="/" class="nav-back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Voltar ao site
+          </a>
+          <a href="/admin-logout" class="btn btn--danger btn--sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Sair
+          </a>
+        </nav>
+
+        <div class="container container--wide">
+          <div class="header">
+            <div class="logo">
+              <img src="/public/logo.png" alt="Logo" class="logo-img">
+            </div>
+            <div class="header-content">
+              <h1 class="header-title">Painel Administrativo</h1>
+              <p class="header-subtitle">Gerencie produtos e notificacoes</p>
+            </div>
+          </div>
+
+          <!-- Produtos -->
+          <div class="card mb-4">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+              <span class="card-header-title">Produtos Cadastrados (${products.length})</span>
+              <button id="trigger" class="btn btn--primary btn--sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 2L11 13"></path>
+                  <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                </svg>
+                Disparar notificacoes
+              </button>
+            </div>
+            <div class="table-container" style="border:0;border-radius:0">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Nome</th>
+                    <th>Validade</th>
+                    <th>Unidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${productRows || '<tr><td colspan="4" class="table-empty">Nenhum produto cadastrado</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Teste -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <span class="card-header-title">Enviar Mensagem de Teste</span>
+            </div>
+            <div class="card-body">
+              <div class="test-box-form">
+                <div class="form-field">
+                  <label for="testUnidade" class="form-label">Unidade</label>
+                  <select id="testUnidade" class="form-input" style="min-width:180px">
+                    ${unitOptions}
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="testUser" class="form-label">Slack ID</label>
+                  <input id="testUser" class="form-input" placeholder="U0895CZ8HU7" value="U0895CZ8HU7" style="min-width:160px">
+                </div>
+                <div class="form-field" style="align-self:flex-end">
+                  <button id="testBtn" class="btn btn--secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    Enviar teste
+                  </button>
+                </div>
+              </div>
+
+              <div id="resp" class="message mt-4" style="display:none"></div>
+            </div>
+          </div>
+
+          <!-- Trocas -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-header-title">Trocas Registradas (${exchanges.length})</span>
+            </div>
+            <div class="table-container" style="border:0;border-radius:0">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Produto</th>
+                    <th>Unidade</th>
+                    <th>Trocado por</th>
+                    <th>Data/Hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${exchangeRows || '<tr><td colspan="5" class="table-empty">Nenhuma troca registrada</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
-        <h2>Produtos cadastrados (${products.length})</h2>
-        <p>
-          <button id="trigger">Disparar notificações agora</button>
-        </p>
-        <table>
-          <thead><tr><th>SKU</th><th>Nome</th><th>Validade</th><th>Unidade</th></tr></thead>
-          <tbody>
-            ${productRows || '<tr><td colspan="4">Nenhum produto</td></tr>'}
-          </tbody>
-        </table>
-
-        <div class="test-box">
-          <h4>Enviar mensagem de teste</h4>
-          <p>
-            <label>Unidade:</label>
-            <select id="testUnidade">
-              ${unitOptions}
-            </select>
-            <label style="margin-left:12px">Slack ID (destino):</label>
-            <input id="testUser" placeholder="U0895CZ8HU7" value="U0895CZ8HU7">
-            <button id="testBtn" style="background:#0f6f4f">Enviar teste</button>
-          </p>
-        </div>
-
-        <div class="section">
-          <h3>Trocas registradas (${exchanges.length})</h3>
-          <table>
-            <thead><tr><th>SKU</th><th>Produto</th><th>Unidade</th><th>Trocado por</th><th>Data/Hora</th></tr></thead>
-            <tbody>
-              ${exchangeRows || '<tr><td colspan="5">Nenhuma troca registrada</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-
-        <div id="resp" style="margin-top:12px;padding:12px;background:#e8f5e9;border-radius:6px;display:none"></div>
+        <div id="toast" class="toast"></div>
 
         <script>
           const respEl = document.getElementById('resp');
           function showResp(msg, isError) {
             respEl.textContent = msg;
             respEl.style.display = 'block';
-            respEl.style.background = isError ? '#ffebee' : '#e8f5e9';
+            respEl.className = 'message mt-4 ' + (isError ? 'message--error' : 'message--success');
           }
 
           document.getElementById('trigger').addEventListener('click', async () => {
-            showResp('Executando...');
+            showResp('Executando...', false);
             try {
               const r = await fetch('/admin/notify', { method: 'POST' });
               const j = await r.json();
@@ -605,7 +709,7 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
           document.getElementById('testBtn').addEventListener('click', async () => {
             const user = document.getElementById('testUser').value.trim() || 'U0895CZ8HU7';
             const unidade = document.getElementById('testUnidade').value;
-            showResp('Enviando teste para ' + user + '...');
+            showResp('Enviando teste para ' + user + '...', false);
             try {
               const r = await fetch('/admin/test', {
                 method: 'POST',

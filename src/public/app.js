@@ -78,7 +78,7 @@
     const validade = data.get('validade') || '';
     if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(validade)){
       resp.textContent = 'Use o formato de data YYYY-MM-DD.';
-      resp.className = 'message error';
+      resp.className = 'message message--error mt-4';
       return;
     }
 
@@ -97,17 +97,19 @@
       if (res.ok) {
         showToast((json && json.message) ? json.message : 'Produto cadastrado com sucesso!');
         resp.textContent = (json && json.message) ? json.message : 'Produto cadastrado com sucesso!';
-        resp.className = 'message success';
+        resp.className = 'message message--success mt-4';
         form.reset();
+        nomeInput.classList.remove('auto-filled', 'new-product');
+        nomeInput.placeholder = 'Ex: Batom Vermelho';
       } else {
         const msg = (json && json.message) ? json.message : 'Erro ao cadastrar';
         resp.textContent = msg;
-        resp.className = 'message error';
+        resp.className = 'message message--error mt-4';
         markErrors();
       }
     } catch (err) {
       resp.textContent = 'Falha de rede. Tente novamente.';
-      resp.className = 'message error';
+      resp.className = 'message message--error mt-4';
       showToast('Falha de rede. Tente novamente.');
     } finally {
       setTimeout(() => setLoading(false), 300); // small delay for UX
