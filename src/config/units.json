@@ -5,6 +5,7 @@
     {
       "id": "vd-palmeira",
       "name": "VD Palmeira dos Indios",
+      "code": "1515",
       "members": [
         { "name": "Jonathan", "slackId": "U07L4D3EWJW" },
         { "name": "Yasmin Rocha", "slackId": "U08F8T8SMNE" },
@@ -14,6 +15,7 @@
     {
       "id": "vd-penedo",
       "name": "VD Penedo",
+      "code": "1048",
       "members": [
         { "name": "Ana Clara", "slackId": "U08F9KK0AAG" },
         { "name": "David Silva", "slackId": "U08NERQKFD4" }
@@ -22,6 +24,7 @@
     {
       "id": "loja-palmeira",
       "name": "Loja Palmeira dos Indios",
+      "code": "24668",
       "members": [
         { "name": "Roberia", "slackId": "U08B1MQJL3C" }
       ]
@@ -29,6 +32,7 @@
     {
       "id": "loja-sao-sebastiao",
       "name": "Loja Sao Sebastiao",
+      "code": "24303",
       "members": [
         { "name": "Maryanna Trajano", "slackId": "U09ED214T6W" },
         { "name": "Kemilly", "slackId": "U087HDEARA9" }
@@ -37,6 +41,7 @@
     {
       "id": "loja-teotonio-vilela",
       "name": "Loja Teotonio Vilela",
+      "code": "24671",
       "members": [
         { "name": "Eliene", "slackId": "U087P8JF97F" }
       ]
@@ -44,6 +49,7 @@
     {
       "id": "loja-coruripe",
       "name": "Loja Coruripe",
+      "code": "24670",
       "members": [
         { "name": "Bruna Rayana", "slackId": "U08NLNHF29G" },
         { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" }
@@ -52,6 +58,7 @@
     {
       "id": "loja-penedo",
       "name": "Loja Penedo",
+      "code": "24669",
       "members": [
         { "name": "Deise Gislane", "slackId": "U092FQKNFPB" }
       ]

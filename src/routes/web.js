@@ -34,7 +34,7 @@ router.get('/', (req, res) => {
 
   const unitOptions = getUnitOptions();
   const unitCardsHtml = unitOptions.map(u => `
-    <a href="/selecionar-unidade?unidade=${u.id}" class="unit-card">
+    <a href="/autenticar-unidade?unidade=${u.id}" class="unit-card">
       <div class="unit-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -88,17 +88,88 @@ router.get('/', (req, res) => {
   res.send(html);
 });
 
-// Selecionar unidade e salvar cookie
-router.get('/selecionar-unidade', (req, res) => {
-  const { unidade } = req.query;
+// Página de autenticação da unidade
+router.get('/autenticar-unidade', (req, res) => {
+  const { unidade, error } = req.query;
+  const unit = getUnitById(unidade);
 
-  if (!unidade || !getUnitById(unidade)) {
+  if (!unidade || !unit) {
     return res.redirect('/');
   }
 
-  // Salva cookie por 30 dias
-  res.setHeader('Set-Cookie', `unidade=${encodeURIComponent(unidade)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; SameSite=Lax`);
-  res.redirect('/cadastro');
+  const html = `
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#006837">
+    <title>Autenticar — ${unit.name}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/public/style.css">
+  </head>
+  <body class="login-container">
+    <div class="login-box">
+      <div class="card">
+        <div class="card-body">
+          <div class="login-header">
+            <div class="logo">
+              <img src="/public/logo.png" alt="Logo" class="logo-img">
+            </div>
+            <h1 class="login-title">${unit.name}</h1>
+            <p class="login-subtitle">Digite o codigo da unidade para acessar</p>
+          </div>
+
+          ${error ? '<div class="message message--error mb-4">Codigo incorreto. Tente novamente.</div>' : ''}
+
+          <form method="POST" action="/autenticar-unidade">
+            <input type="hidden" name="unidade" value="${unidade}">
+            <div class="form-field mb-4">
+              <label for="codigo" class="form-label">Codigo da Unidade</label>
+              <input type="password" id="codigo" name="codigo" class="form-input" placeholder="Digite o codigo" required autofocus inputmode="numeric" pattern="[0-9]*">
+            </div>
+            <button type="submit" class="btn btn--primary" style="width:100%">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+              </svg>
+              Entrar
+            </button>
+          </form>
+
+          <p class="text-center text-muted text-small mt-4">
+            <a href="/" class="header-link">Escolher outra unidade</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+  res.send(html);
+});
+
+// Processar autenticação da unidade
+router.post('/autenticar-unidade', express.urlencoded({ extended: true }), (req, res) => {
+  const { unidade, codigo } = req.body;
+  const unit = getUnitById(unidade);
+
+  if (!unidade || !unit) {
+    return res.redirect('/');
+  }
+
+  // Verifica se o código está correto
+  if (codigo === unit.code) {
+    // Salva cookie por 30 dias
+    res.setHeader('Set-Cookie', `unidade=${encodeURIComponent(unidade)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; SameSite=Lax`);
+    return res.redirect('/cadastro');
+  } else {
+    // Código incorreto
+    return res.redirect(`/autenticar-unidade?unidade=${unidade}&error=1`);
+  }
 });
 
 // Trocar unidade
