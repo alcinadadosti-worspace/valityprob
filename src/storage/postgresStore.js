@@ -140,27 +140,49 @@ const readCsv = (filePath, delimiter = ',') => {
   });
 };
 
-const getProductFromCatalog = (sku) => {
+// CACHE em memória para busca rápida
+let catalogCache = null;
+let catalogDescKey = null;
+
+const loadCatalogCache = () => {
+  if (catalogCache) return;
+
   ensureCatalogFile();
   const products = readCsv(CATALOG_FILE, ';');
-  const found = products.find(p => p.Produto === sku);
-  if (found) {
-    const descKey = Object.keys(found).find(k => k.includes('Descri'));
-    const nome = descKey ? found[descKey] : '';
-    return { sku: found.Produto, nome };
+
+  catalogCache = new Map();
+
+  if (products.length > 0) {
+    catalogDescKey = Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição';
+
+    for (const p of products) {
+      if (!catalogCache.has(p.Produto)) {
+        catalogCache.set(p.Produto, p[catalogDescKey] || '');
+      }
+    }
+  }
+
+  console.log(`📦 Catálogo carregado: ${catalogCache.size} produtos únicos`);
+};
+
+const getProductFromCatalog = (sku) => {
+  loadCatalogCache();
+
+  if (catalogCache.has(sku)) {
+    return { sku, nome: catalogCache.get(sku) };
   }
   return null;
 };
 
 const addProductToCatalog = ({ sku, nome }) => {
+  loadCatalogCache();
+  catalogCache.set(sku, nome);
+
   ensureCatalogFile();
   let products = readCsv(CATALOG_FILE, ';');
   products = products.filter(p => p.Produto !== sku);
 
-  const descKey = products.length > 0
-    ? Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição'
-    : 'Descrição';
-
+  const descKey = catalogDescKey || 'Descrição';
   const newProduct = { Produto: sku };
   newProduct[descKey] = nome;
   products.push(newProduct);
@@ -177,15 +199,13 @@ const addProductToCatalog = ({ sku, nome }) => {
 };
 
 const listCatalog = () => {
-  ensureCatalogFile();
-  const products = readCsv(CATALOG_FILE, ';');
-  return products.map(p => {
-    const descKey = Object.keys(p).find(k => k.includes('Descri'));
-    return {
-      sku: p.Produto,
-      nome: descKey ? p[descKey] : ''
-    };
-  });
+  loadCatalogCache();
+
+  const result = [];
+  for (const [sku, nome] of catalogCache) {
+    result.push({ sku, nome });
+  }
+  return result;
 };
 
 module.exports = {

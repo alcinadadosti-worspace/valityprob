@@ -171,31 +171,55 @@ const deleteExchange = (sku, unidade) => {
 // ==================== CATALOG (estoque.csv) ====================
 // Colunas: Produto (SKU), Descrição (nome do item)
 // Usa ponto-e-vírgula como separador
+// CACHE em memória para busca rápida (arquivo tem 180k+ linhas)
 
-const getProductFromCatalog = (sku) => {
+let catalogCache = null;
+let catalogDescKey = null;
+
+const loadCatalogCache = () => {
+  if (catalogCache) return;
+
   ensureCatalogFile();
   const products = readCsv(CATALOG_FILE, ';');
-  // Busca pelo SKU (coluna Produto)
-  const found = products.find(p => p.Produto === sku);
-  if (found) {
-    // Pega o nome da coluna Descrição (pode ter encoding diferente)
-    const descKey = Object.keys(found).find(k => k.includes('Descri'));
-    const nome = descKey ? found[descKey] : '';
-    return { sku: found.Produto, nome };
+
+  // Cria um Map indexado por SKU para busca O(1)
+  catalogCache = new Map();
+
+  if (products.length > 0) {
+    catalogDescKey = Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição';
+
+    for (const p of products) {
+      // Só guarda o primeiro (evita duplicados)
+      if (!catalogCache.has(p.Produto)) {
+        catalogCache.set(p.Produto, p[catalogDescKey] || '');
+      }
+    }
+  }
+
+  console.log(`📦 Catálogo carregado: ${catalogCache.size} produtos únicos`);
+};
+
+const getProductFromCatalog = (sku) => {
+  loadCatalogCache();
+
+  if (catalogCache.has(sku)) {
+    return { sku, nome: catalogCache.get(sku) };
   }
   return null;
 };
 
 const addProductToCatalog = ({ sku, nome }) => {
+  loadCatalogCache();
+
+  // Adiciona ao cache
+  catalogCache.set(sku, nome);
+
+  // Também salva no arquivo
   ensureCatalogFile();
   let products = readCsv(CATALOG_FILE, ';');
   products = products.filter(p => p.Produto !== sku);
 
-  // Pega a chave correta da coluna descrição
-  const descKey = products.length > 0
-    ? Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição'
-    : 'Descrição';
-
+  const descKey = catalogDescKey || 'Descrição';
   const newProduct = { Produto: sku };
   newProduct[descKey] = nome;
   products.push(newProduct);
@@ -212,15 +236,13 @@ const addProductToCatalog = ({ sku, nome }) => {
 };
 
 const listCatalog = () => {
-  ensureCatalogFile();
-  const products = readCsv(CATALOG_FILE, ';');
-  return products.map(p => {
-    const descKey = Object.keys(p).find(k => k.includes('Descri'));
-    return {
-      sku: p.Produto,
-      nome: descKey ? p[descKey] : ''
-    };
-  });
+  loadCatalogCache();
+
+  const result = [];
+  for (const [sku, nome] of catalogCache) {
+    result.push({ sku, nome });
+  }
+  return result;
 };
 
 module.exports = {
