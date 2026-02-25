@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addProduct, listProducts, listProductsByUnit, listExchanges } = require('../storage');
+const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog } = require('../storage');
 const { isValidDateString, parseDate, daysUntil } = require('../utils/dates');
 const { runNotificationJob, sendAlertsToMember, buildAlertPayload } = require('../scheduler/notify');
 const { getUnitOptions, getUnitById, getAllUnits } = require('../config/unitsHelper');
@@ -247,6 +247,13 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
 
   try {
     await addProduct({ sku, nome, validade, unidade });
+
+    // Salva também no catálogo (estoque.csv) se for um produto novo
+    const existsInCatalog = getProductFromCatalog(sku);
+    if (!existsInCatalog) {
+      addProductToCatalog({ sku, nome });
+    }
+
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.json({ ok: true, message: 'Produto cadastrado com sucesso!' });
     }
@@ -336,6 +343,19 @@ router.get('/items', async (req, res) => {
   `;
 
   res.send(html);
+});
+
+// ==================== API DO CATÁLOGO ====================
+
+// Buscar produto no catálogo pelo SKU
+router.get('/api/catalog/:sku', (req, res) => {
+  const { sku } = req.params;
+  const product = getProductFromCatalog(sku);
+  if (product) {
+    res.json({ found: true, nome: product.nome });
+  } else {
+    res.json({ found: false });
+  }
 });
 
 // ==================== ÁREA ADMINISTRATIVA ====================

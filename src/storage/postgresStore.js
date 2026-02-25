@@ -1,4 +1,11 @@
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
+const { parse } = require('csv-parse/sync');
+const { stringify } = require('csv-stringify/sync');
+
+const DATA_DIR = path.join(__dirname, '../../data');
+const CATALOG_FILE = path.join(DATA_DIR, 'estoque.csv');
 
 const getPool = () => {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');
@@ -108,6 +115,79 @@ const deleteExchange = async (sku, unidade) => {
   return true;
 };
 
+// ==================== CATALOG (estoque.csv - sempre CSV) ====================
+
+const ensureDir = () => {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+};
+
+const ensureCatalogFile = () => {
+  ensureDir();
+  if (!fs.existsSync(CATALOG_FILE)) {
+    fs.writeFileSync(CATALOG_FILE, 'Produto;Descrição\n');
+  }
+};
+
+const readCsv = (filePath, delimiter = ',') => {
+  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  return parse(fileContent, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    delimiter: delimiter
+  });
+};
+
+const getProductFromCatalog = (sku) => {
+  ensureCatalogFile();
+  const products = readCsv(CATALOG_FILE, ';');
+  const found = products.find(p => p.Produto === sku);
+  if (found) {
+    const descKey = Object.keys(found).find(k => k.includes('Descri'));
+    const nome = descKey ? found[descKey] : '';
+    return { sku: found.Produto, nome };
+  }
+  return null;
+};
+
+const addProductToCatalog = ({ sku, nome }) => {
+  ensureCatalogFile();
+  let products = readCsv(CATALOG_FILE, ';');
+  products = products.filter(p => p.Produto !== sku);
+
+  const descKey = products.length > 0
+    ? Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição'
+    : 'Descrição';
+
+  const newProduct = { Produto: sku };
+  newProduct[descKey] = nome;
+  products.push(newProduct);
+
+  const columns = ['Produto', descKey];
+  const output = stringify(products, {
+    header: true,
+    columns: columns,
+    delimiter: ';'
+  });
+
+  fs.writeFileSync(CATALOG_FILE, output);
+  return true;
+};
+
+const listCatalog = () => {
+  ensureCatalogFile();
+  const products = readCsv(CATALOG_FILE, ';');
+  return products.map(p => {
+    const descKey = Object.keys(p).find(k => k.includes('Descri'));
+    return {
+      sku: p.Produto,
+      nome: descKey ? p[descKey] : ''
+    };
+  });
+};
+
 module.exports = {
   listProducts,
   listProductsByUnit,
@@ -118,5 +198,8 @@ module.exports = {
   getExchange,
   listExchanges,
   listExchangesByUnit,
-  deleteExchange
+  deleteExchange,
+  getProductFromCatalog,
+  addProductToCatalog,
+  listCatalog
 };

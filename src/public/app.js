@@ -3,10 +3,43 @@
   const resp = document.getElementById('resp');
   const resetBtn = document.getElementById('resetBtn');
   const submitBtn = document.getElementById('submitBtn');
+  const skuInput = document.getElementById('sku');
+  const nomeInput = document.getElementById('nome');
 
   if (!form) return;
 
-  resetBtn.addEventListener('click', () => { form.reset(); resp.innerHTML = ''; resp.className = ''; });
+  // Busca automática do nome ao sair do campo SKU
+  let searchTimeout = null;
+  skuInput.addEventListener('blur', async () => {
+    const sku = skuInput.value.trim();
+    if (!sku) return;
+
+    try {
+      const res = await fetch(`/api/catalog/${encodeURIComponent(sku)}`);
+      const data = await res.json();
+      if (data.found) {
+        nomeInput.value = data.nome;
+        nomeInput.classList.add('auto-filled');
+        showToast('Produto encontrado no catálogo!');
+      } else {
+        nomeInput.classList.remove('auto-filled');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar catálogo:', err);
+    }
+  });
+
+  // Remove estilo de auto-preenchido ao editar manualmente
+  nomeInput.addEventListener('input', () => {
+    nomeInput.classList.remove('auto-filled');
+  });
+
+  resetBtn.addEventListener('click', () => {
+    form.reset();
+    resp.innerHTML = '';
+    resp.className = '';
+    nomeInput.classList.remove('auto-filled');
+  });
 
   function setLoading(loading){
     if (loading){
