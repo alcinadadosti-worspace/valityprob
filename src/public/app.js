@@ -20,9 +20,15 @@
       if (data.found) {
         nomeInput.value = data.nome;
         nomeInput.classList.add('auto-filled');
+        nomeInput.classList.remove('new-product');
         showToast('Produto encontrado no catálogo!');
       } else {
+        nomeInput.value = '';
         nomeInput.classList.remove('auto-filled');
+        nomeInput.classList.add('new-product');
+        nomeInput.placeholder = 'Produto novo - digite o nome';
+        nomeInput.focus();
+        showToast('Produto novo! Digite o nome para cadastrar.');
       }
     } catch (err) {
       console.error('Erro ao buscar catálogo:', err);
@@ -39,6 +45,8 @@
     resp.innerHTML = '';
     resp.className = '';
     nomeInput.classList.remove('auto-filled');
+    nomeInput.classList.remove('new-product');
+    nomeInput.placeholder = 'Ex: Batom Vermelho';
   });
 
   function setLoading(loading){
