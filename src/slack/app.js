@@ -176,8 +176,8 @@ async function processExchange(body, client, action) {
 
 // Atualiza os blocks para mostrar confirmação
 function updateBlocksWithConfirmation(blocks, sku, userName, clickedAt) {
-  const options = { timeZone: 'America/Maceio', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
-  const timestamp = clickedAt ? new Date(clickedAt).toLocaleString('pt-BR', options) : new Date().toLocaleString('pt-BR', options);
+  // clickedAt já vem formatado do banco (DD/MM/YYYY, HH24:MI) no horário de Maceió
+  const timestamp = clickedAt || new Date().toLocaleString('pt-BR', { timeZone: 'America/Maceio', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return blocks.map(block => {
     if (block.type === 'section' && block.accessory && block.accessory.action_id === `trocar_${sku}`) {
