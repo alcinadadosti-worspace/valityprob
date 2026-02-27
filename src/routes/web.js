@@ -9,6 +9,34 @@ const slackAppModule = require('../slack/app');
 // Senha do admin
 const ADMIN_PASSWORD = '333399';
 
+// Helper para gerar meta tags PWA
+function getPWAMetaTags() {
+  return `
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Validade">
+    <link rel="apple-touch-icon" href="/public/logo.png">
+    <link rel="icon" type="image/png" href="/public/logo.png">
+  `;
+}
+
+// Script para registrar o service worker
+function getServiceWorkerScript() {
+  return `
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+  `;
+}
+
 // Helper para parse de cookies
 function parseCookies(req) {
   const cookies = {};
@@ -57,6 +85,7 @@ router.get('/', (req, res) => {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
+    ${getPWAMetaTags()}
   </head>
   <body>
     <div class="container container--narrow">
@@ -82,6 +111,7 @@ router.get('/', (req, res) => {
         <a href="/admin-login" class="header-link" style="opacity:0.6">Acessar painel administrativo</a>
       </p>
     </div>
+    ${getServiceWorkerScript()}
   </body>
   </html>
   `;
@@ -109,6 +139,7 @@ router.get('/autenticar-unidade', (req, res) => {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
+    ${getPWAMetaTags()}
   </head>
   <body class="login-container">
     <div class="login-box">
@@ -146,6 +177,7 @@ router.get('/autenticar-unidade', (req, res) => {
         </div>
       </div>
     </div>
+    ${getServiceWorkerScript()}
   </body>
   </html>
   `;
@@ -202,6 +234,7 @@ router.get('/cadastro', (req, res) => {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/public/style.css">
+    ${getPWAMetaTags()}
   </head>
   <body>
     <div class="container">
@@ -274,6 +307,7 @@ router.get('/cadastro', (req, res) => {
 
     <div id="toast" class="toast"></div>
     <script src="/public/app.js" defer></script>
+    ${getServiceWorkerScript()}
   </body>
   </html>
   `;
@@ -383,6 +417,7 @@ router.get('/items', async (req, res) => {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="/public/style.css">
+      ${getPWAMetaTags()}
     </head>
     <body>
       <nav class="nav-bar">
@@ -472,6 +507,7 @@ router.get('/items', async (req, res) => {
           }
         }
       </script>
+      ${getServiceWorkerScript()}
     </body>
   </html>
   `;
@@ -525,6 +561,7 @@ router.get('/admin-login', (req, res) => {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="/public/style.css">
+      ${getPWAMetaTags()}
     </head>
     <body class="login-container">
       <div class="login-box">
@@ -560,6 +597,7 @@ router.get('/admin-login', (req, res) => {
           </div>
         </div>
       </div>
+      ${getServiceWorkerScript()}
     </body>
   </html>
   `;
@@ -639,6 +677,7 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="/public/style.css">
+        ${getPWAMetaTags()}
       </head>
       <body>
         <nav class="nav-bar">
@@ -793,6 +832,7 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
             }
           });
         </script>
+        ${getServiceWorkerScript()}
       </body>
     </html>
   `;

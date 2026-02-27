@@ -13,6 +13,19 @@ const PORT = process.env.PORT || 3000;
 receiver.router.use('/public', express.static(path.join(__dirname, 'public')));
 // Fallback: também aceite um diretório /public na raiz do repositório (compatibilidade)
 receiver.router.use('/public', express.static(path.join(__dirname, '..', 'public')));
+
+// PWA: Servir service worker e manifest na raiz (necessário para escopo correto)
+receiver.router.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+
+receiver.router.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
 receiver.router.use('/', webRoutes);
 
 // Servir logo a partir de src/public/logo.png se existir, senão procurar na raiz
