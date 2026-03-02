@@ -866,7 +866,7 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
               if (user) users.push(user);
             } else {
               const text = document.getElementById('testUsers').value;
-              users = text.split(/[,\\s\\n]+/).map(s => s.trim()).filter(s => s.startsWith('U'));
+              users = text.split(/[,\\s]+/).map(s => s.trim()).filter(s => s.startsWith('U'));
             }
 
             if (users.length === 0) {
