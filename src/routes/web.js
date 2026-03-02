@@ -738,30 +738,60 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
             </div>
           </div>
 
-          <!-- Teste -->
+          <!-- Teste Avançado -->
           <div class="card mb-4">
             <div class="card-header">
               <span class="card-header-title">Enviar Mensagem de Teste</span>
             </div>
             <div class="card-body">
-              <div class="test-box-form">
+              <div class="form-grid" style="gap:16px">
+                <!-- Linha 1: Produto -->
+                <div class="form-field form-field--full">
+                  <label class="form-label">Produto de Teste</label>
+                  <div style="display:flex;gap:12px;flex-wrap:wrap">
+                    <input id="testSku" class="form-input" placeholder="SKU (ex: 12345)" style="flex:1;min-width:120px">
+                    <input id="testNome" class="form-input" placeholder="Nome do produto" style="flex:2;min-width:200px">
+                    <input id="testValidade" type="date" class="form-input" style="flex:1;min-width:140px">
+                  </div>
+                  <span class="form-hint">Deixe em branco para usar produto exemplo automatico</span>
+                </div>
+
+                <!-- Linha 2: Unidade -->
                 <div class="form-field">
                   <label for="testUnidade" class="form-label">Unidade</label>
-                  <select id="testUnidade" class="form-input" style="min-width:180px">
+                  <select id="testUnidade" class="form-input">
                     ${unitOptions}
                   </select>
                 </div>
-                <div class="form-field">
-                  <label for="testUser" class="form-label">Slack ID</label>
-                  <input id="testUser" class="form-input" placeholder="U0895CZ8HU7" value="U0895CZ8HU7" style="min-width:160px">
+
+                <!-- Linha 3: Modo de envio -->
+                <div class="form-field form-field--full">
+                  <label class="form-label">Destinatarios</label>
+                  <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                      <input type="radio" name="testMode" value="single" checked> Enviar para um Slack ID
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                      <input type="radio" name="testMode" value="multiple"> Enviar para multiplos IDs
+                    </label>
+                  </div>
+                  <div id="singleUserBox">
+                    <input id="testUser" class="form-input" placeholder="Slack ID (ex: U0895CZ8HU7)" value="U0895CZ8HU7">
+                  </div>
+                  <div id="multiUserBox" style="display:none">
+                    <textarea id="testUsers" class="form-input" rows="3" placeholder="Cole os Slack IDs separados por virgula ou linha:&#10;U0895CZ8HU7&#10;U07L4D3EWJW&#10;U08F8T8SMNE"></textarea>
+                    <span class="form-hint">Separe os IDs por virgula, espaco ou quebra de linha</span>
+                  </div>
                 </div>
-                <div class="form-field" style="align-self:flex-end">
-                  <button id="testBtn" class="btn btn--secondary">
+
+                <!-- Botao -->
+                <div class="form-field form-field--full">
+                  <button id="testBtn" class="btn btn--primary" style="width:100%">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <line x1="22" y1="2" x2="11" y2="13"></line>
                       <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
-                    Enviar teste
+                    Enviar Teste
                   </button>
                 </div>
               </div>
@@ -815,15 +845,41 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
             }
           });
 
+          // Toggle entre modo single e multiple
+          document.querySelectorAll('input[name="testMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+              document.getElementById('singleUserBox').style.display = e.target.value === 'single' ? 'block' : 'none';
+              document.getElementById('multiUserBox').style.display = e.target.value === 'multiple' ? 'block' : 'none';
+            });
+          });
+
           document.getElementById('testBtn').addEventListener('click', async () => {
-            const user = document.getElementById('testUser').value.trim() || 'U0895CZ8HU7';
+            const mode = document.querySelector('input[name="testMode"]:checked').value;
             const unidade = document.getElementById('testUnidade').value;
-            showResp('Enviando teste para ' + user + '...', false);
+            const sku = document.getElementById('testSku').value.trim();
+            const nome = document.getElementById('testNome').value.trim();
+            const validade = document.getElementById('testValidade').value;
+
+            let users = [];
+            if (mode === 'single') {
+              const user = document.getElementById('testUser').value.trim();
+              if (user) users.push(user);
+            } else {
+              const text = document.getElementById('testUsers').value;
+              users = text.split(/[,\\s\\n]+/).map(s => s.trim()).filter(s => s.startsWith('U'));
+            }
+
+            if (users.length === 0) {
+              showResp('Informe pelo menos um Slack ID', true);
+              return;
+            }
+
+            showResp('Enviando teste para ' + users.length + ' destinatario(s)...', false);
             try {
               const r = await fetch('/admin/test', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ user, unidade })
+                body: JSON.stringify({ users, unidade, sku, nome, validade })
               });
               const j = await r.json();
               showResp(j.message || JSON.stringify(j), !j.ok);
@@ -857,31 +913,78 @@ router.post('/admin/notify', requireAdminAuth, async (req, res) => {
 
 router.post('/admin/test', requireAdminAuth, express.json(), async (req, res) => {
   const { app } = slackAppModule;
-  const user = (req.body && req.body.user) || 'U0895CZ8HU7';
-  const unidade = (req.body && req.body.unidade) || 'vd-palmeira';
 
   if (!app) return res.status(400).json({ ok: false, message: 'Slack App não configurado.' });
 
-  try {
-    const products = await listProductsByUnit(unidade);
-    const items = products.filter(p => {
-      const expiryDate = parseDate(p.VALIDADE);
-      return daysUntil(expiryDate) === 7;
-    });
+  // Suporte a array de usuarios ou usuario unico (retrocompatibilidade)
+  let users = req.body.users || [];
+  if (req.body.user && users.length === 0) {
+    users = [req.body.user];
+  }
+  if (users.length === 0) {
+    users = ['U0895CZ8HU7'];
+  }
 
-    if (items.length === 0) {
-      const example = [{
-        SKU: '0000',
-        NOME: 'Exemplo Produto',
-        VALIDADE: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10),
+  const unidade = req.body.unidade || 'vd-palmeira';
+  const customSku = req.body.sku || '';
+  const customNome = req.body.nome || '';
+  const customValidade = req.body.validade || '';
+
+  try {
+    let items = [];
+
+    // Se usuario definiu produto customizado
+    if (customSku || customNome) {
+      const validade = customValidade || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
+      items = [{
+        SKU: customSku || '0000',
+        NOME: customNome || 'Produto Teste',
+        VALIDADE: validade,
         UNIDADE: unidade
       }];
-      await sendAlertsToMember(app, user, example, unidade);
-      return res.json({ ok: true, message: 'Preview enviado (exemplo) — não havia itens com 7 dias para essa unidade.' });
+    } else {
+      // Busca produtos reais da unidade que vencem em 7 dias
+      const products = await listProductsByUnit(unidade);
+      items = products.filter(p => {
+        const expiryDate = parseDate(p.VALIDADE);
+        return daysUntil(expiryDate) === 7;
+      });
+
+      // Se nao houver, usa exemplo
+      if (items.length === 0) {
+        items = [{
+          SKU: '0000',
+          NOME: 'Exemplo Produto',
+          VALIDADE: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10),
+          UNIDADE: unidade
+        }];
+      }
     }
 
-    await sendAlertsToMember(app, user, items, unidade);
-    return res.json({ ok: true, message: `Mensagem de alerta enviada para ${user} com ${items.length} item(ns).` });
+    // Envia para todos os usuarios em paralelo
+    const results = await Promise.allSettled(
+      users.map(user => sendAlertsToMember(app, user, items, unidade))
+    );
+
+    const success = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    if (failed > 0) {
+      const errors = results
+        .filter(r => r.status === 'rejected')
+        .map(r => r.reason?.data?.error || r.reason?.message || 'Erro desconhecido');
+      console.error('Erros ao enviar testes:', errors);
+    }
+
+    const itemInfo = customSku || customNome
+      ? `produto "${items[0].NOME}" (SKU: ${items[0].SKU}, Validade: ${items[0].VALIDADE})`
+      : `${items.length} item(ns)`;
+
+    if (failed === 0) {
+      return res.json({ ok: true, message: `Teste enviado para ${success} destinatario(s) com ${itemInfo}.` });
+    } else {
+      return res.json({ ok: true, message: `Enviado para ${success} de ${users.length} destinatarios. ${failed} falha(s).` });
+    }
   } catch (err) {
     console.error('Erro ao enviar teste:', err?.data?.error || err.message || err);
     return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
