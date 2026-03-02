@@ -7,6 +7,69 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
+// Função para rodar migrações do banco de dados automaticamente
+async function runMigrations() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.log('📁 Usando armazenamento CSV (DATABASE_URL não configurada)');
+    return;
+  }
+
+  console.log('🔄 Verificando migrações do banco de dados...');
+
+  try {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+
+    // Cria tabelas se não existirem
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        sku TEXT PRIMARY KEY,
+        nome TEXT NOT NULL,
+        validade DATE NOT NULL,
+        unidade TEXT NOT NULL
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS exchanges (
+        id SERIAL PRIMARY KEY,
+        sku TEXT NOT NULL,
+        produto_nome TEXT,
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        unidade TEXT NOT NULL,
+        clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migration: adiciona coluna validade em exchanges
+    await pool.query(`ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS validade TEXT DEFAULT ''`);
+
+    // Migration: atualiza constraint para incluir validade
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exchanges_sku_unidade_key') THEN
+          ALTER TABLE exchanges DROP CONSTRAINT exchanges_sku_unidade_key;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exchanges_sku_unidade_validade_key') THEN
+          BEGIN
+            ALTER TABLE exchanges ADD CONSTRAINT exchanges_sku_unidade_validade_key UNIQUE (sku, unidade, validade);
+          EXCEPTION WHEN duplicate_table THEN
+            NULL;
+          END;
+        END IF;
+      END $$
+    `);
+
+    await pool.end();
+    console.log('✅ Migrações concluídas com sucesso!');
+  } catch (err) {
+    console.error('⚠️ Erro nas migrações (continuando mesmo assim):', err.message);
+  }
+}
+
 // Configura rotas da Web no ExpressReceiver
 // (Isso funciona independente do Bot estar ativo)
 // Servir arquivos estáticos (CSS/JS) colocados em src/public (prioritário)
@@ -44,6 +107,9 @@ receiver.router.get('/health', (req, res) => {
 
 // Função principal de inicialização
 (async () => {
+  // Roda migrações do banco antes de iniciar
+  await runMigrations();
+
   if (app) {
     // --- CENÁRIO 1: TUDO CONFIGURADO ---
     try {
