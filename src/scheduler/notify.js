@@ -43,10 +43,10 @@ const runNotificationJob = async (app) => {
         const unidade = p.UNIDADE;
         if (!unidade) continue;
 
-        // Verifica se já foi trocado
-        const exchanged = await hasExchange(p.SKU, unidade);
+        // Verifica se já foi trocado (agora considera a validade)
+        const exchanged = await hasExchange(p.SKU, unidade, p.VALIDADE);
         if (exchanged) {
-          console.log(`Produto ${p.SKU} já foi trocado na unidade ${unidade}. Pulando.`);
+          console.log(`Produto ${p.SKU} (validade ${p.VALIDADE}) já foi trocado na unidade ${unidade}. Pulando.`);
           continue;
         }
 
@@ -116,7 +116,7 @@ const buildAlertPayload = (items, unidade) => {
         text: { type: 'plain_text', text: 'Trocar', emoji: true },
         style: 'primary',
         action_id: `trocar_${item.SKU}`,
-        value: JSON.stringify({ sku: item.SKU, unidade: unidade })
+        value: JSON.stringify({ sku: item.SKU, unidade: unidade, validade: item.VALIDADE })
       }
     });
   });

@@ -101,11 +101,12 @@ async function processExchange(body, client, action) {
   console.log('=== PROCESSANDO EXCHANGE ===');
 
   try {
-    const { sku, unidade } = JSON.parse(action.value);
+    const { sku, unidade, validade } = JSON.parse(action.value);
     const userId = body.user.id;
 
     console.log('SKU:', sku);
     console.log('Unidade:', unidade);
+    console.log('Validade:', validade);
     console.log('User ID:', userId);
 
     // Busca o nome real do usuário via API do Slack
@@ -131,8 +132,8 @@ async function processExchange(body, client, action) {
     }
     console.log('Produto:', produtoNome);
 
-    // Verifica se já foi trocado
-    const existing = await getExchange(sku, unidade);
+    // Verifica se já foi trocado (considera a validade)
+    const existing = await getExchange(sku, unidade, validade);
     if (existing) {
       console.log('Produto já foi trocado por:', existing.userName);
       try {
@@ -148,9 +149,9 @@ async function processExchange(body, client, action) {
       return;
     }
 
-    // Salva o exchange
+    // Salva o exchange (inclui validade para diferenciar ciclos do mesmo SKU)
     console.log('Salvando exchange no banco...');
-    await addExchange({ sku, produtoNome, userId, userName, unidade });
+    await addExchange({ sku, produtoNome, userId, userName, unidade, validade });
     console.log('Exchange salvo!');
 
     // Atualiza a mensagem
