@@ -25,6 +25,27 @@ const addProdutoNomeColumn = `
 ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS produto_nome TEXT;
 `;
 
+// Migration: adiciona coluna validade na tabela exchanges
+const addValidadeToExchanges = `
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS validade TEXT DEFAULT '';
+`;
+
+// Migration: atualiza constraint para incluir validade
+const updateExchangesConstraint = `
+DO $$
+BEGIN
+  -- Remove constraint antiga se existir
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exchanges_sku_unidade_key') THEN
+    ALTER TABLE exchanges DROP CONSTRAINT exchanges_sku_unidade_key;
+  END IF;
+
+  -- Adiciona nova constraint com validade (se não existir)
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'exchanges_sku_unidade_validade_key') THEN
+    ALTER TABLE exchanges ADD CONSTRAINT exchanges_sku_unidade_validade_key UNIQUE (sku, unidade, validade);
+  END IF;
+END $$;
+`;
+
 // Migration: adiciona coluna unidade se não existir (para bancos existentes)
 const addUnidadeColumn = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS unidade TEXT;
@@ -75,6 +96,22 @@ ALTER TABLE products DROP COLUMN IF EXISTS manager_id;
       console.log('Coluna `produto_nome` adicionada em exchanges (ou já existia).');
     } catch (err) {
       // Ignora erro se coluna já existe
+    }
+
+    // Migration: adiciona coluna validade em exchanges
+    try {
+      await pool.query(addValidadeToExchanges);
+      console.log('Coluna `validade` adicionada em exchanges (ou já existia).');
+    } catch (err) {
+      console.log('Nota: coluna validade pode já existir.');
+    }
+
+    // Migration: atualiza constraint para incluir validade
+    try {
+      await pool.query(updateExchangesConstraint);
+      console.log('Constraint atualizada para (sku, unidade, validade).');
+    } catch (err) {
+      console.log('Nota: constraint pode já estar atualizada.');
     }
 
   } catch (err) {
