@@ -9,7 +9,8 @@
       "members": [
         { "name": "Jonathan", "slackId": "U07L4D3EWJW" },
         { "name": "Yasmin Rocha", "slackId": "U08F8T8SMNE" },
-        { "name": "Luan", "slackId": "U087M32A18B" }
+        { "name": "Luan", "slackId": "U087M32A18B" },
+        { "name": "Rômulo", "slackId": "U07LSKN7SNL" }
       ]
     },
     {
@@ -18,7 +19,8 @@
       "code": "1048",
       "members": [
         { "name": "Ana Clara", "slackId": "U08F9KK0AAG" },
-        { "name": "David Silva", "slackId": "U08NERQKFD4" }
+        { "name": "David Silva", "slackId": "U08NERQKFD4" },
+        { "name": "Rômulo", "slackId": "U07LSKN7SNL" }
       ]
     },
     {
@@ -26,7 +28,9 @@
       "name": "Loja Palmeira dos Indios",
       "code": "24668",
       "members": [
-        { "name": "Roberia", "slackId": "U08B1MQJL3C" }
+        { "name": "Roberia", "slackId": "U08B1MQJL3C" },
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" },
+        { "name": "Kemilly", "slackId": "U087HDEARA9" }
       ]
     },
     {
@@ -35,7 +39,8 @@
       "code": "24303",
       "members": [
         { "name": "Maryanna Trajano", "slackId": "U09ED214T6W" },
-        { "name": "Kemilly", "slackId": "U087HDEARA9" }
+        { "name": "Kemilly", "slackId": "U087HDEARA9" },
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" }
       ]
     },
     {
@@ -43,7 +48,8 @@
       "name": "Loja Teotonio Vilela",
       "code": "24671",
       "members": [
-        { "name": "Eliene", "slackId": "U087P8JF97F" }
+        { "name": "Eliene", "slackId": "U087P8JF97F" },
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" }
       ]
     },
     {
@@ -52,7 +58,8 @@
       "code": "24670",
       "members": [
         { "name": "Bruna Rayana", "slackId": "U08NLNHF29G" },
-        { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" }
+        { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" },
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" }
       ]
     },
     {
@@ -60,7 +67,9 @@
       "name": "Loja Penedo",
       "code": "24669",
       "members": [
-        { "name": "Deise Gislane", "slackId": "U092FQKNFPB" }
+        { "name": "Deise Gislane", "slackId": "U092FQKNFPB" },
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" },
+        { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" }
       ]
     }
   ]
