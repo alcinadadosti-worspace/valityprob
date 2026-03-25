@@ -1,5 +1,5 @@
 {
-  "testMode": true,
+  "testMode": false,
   "testUserId": "U0895CZ8HU7",
   "units": [
     {
@@ -19,7 +19,7 @@
       "code": "1048",
       "members": [
         { "name": "Ana Clara", "slackId": "U08F9KK0AAG" },
-        { "name": "David Silva", "slackId": "U08NERQKFD4" },
+        { "name": "Carol Martér", "slackId": "U0A2PUWCUKS" },
         { "name": "Rômulo", "slackId": "U07LSKN7SNL" }
       ]
     },
