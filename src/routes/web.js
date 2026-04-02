@@ -368,9 +368,8 @@ router.get('/items', async (req, res) => {
   const unidadeFromCookie = cookies.unidade;
   const { unidade } = req.query;
 
-  // Se não tem unidade na query, usa a do cookie
-  const selectedUnidade = unidade || unidadeFromCookie;
-  const unitOptions = getUnitOptions();
+  // Sempre usa a unidade do cookie, ignorando query params
+  const selectedUnidade = unidadeFromCookie;
 
   let products;
   if (selectedUnidade) {
@@ -380,9 +379,6 @@ router.get('/items', async (req, res) => {
   }
 
   const selectedUnit = selectedUnidade ? getUnitById(selectedUnidade) : null;
-  const unitOptionsHtml = unitOptions.map(u =>
-    `<option value="${u.id}" ${selectedUnidade === u.id ? 'selected' : ''}>${u.name}</option>`
-  ).join('');
 
   const rows = products.length > 0 ? products.map(p => {
     const unit = getUnitById(p.UNIDADE);
@@ -439,15 +435,8 @@ router.get('/items', async (req, res) => {
         </div>
 
         <div class="card">
-          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div class="card-header">
             <span class="card-header-title">Lista de Demonstradores</span>
-            <div style="display:flex;gap:12px;align-items:center">
-              <select id="unitFilter" class="form-input" style="width:auto;min-width:180px;padding:8px 12px" onchange="window.location.href='/items?unidade='+this.value">
-                <option value="">Todas as unidades</option>
-                ${unitOptionsHtml}
-              </select>
-              ${selectedUnidade ? '<a href="/items?unidade=" class="header-link text-small">Limpar filtro</a>' : ''}
-            </div>
           </div>
           <div class="table-container" style="border:0;border-radius:0">
             <table class="table">
