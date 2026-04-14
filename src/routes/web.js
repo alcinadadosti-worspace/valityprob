@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const XLSX = require('xlsx');
 const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog, deleteProduct } = require('../storage');
 const { isValidDateString, parseDate, daysUntil } = require('../utils/dates');
 const { runNotificationJob, sendAlertsToMember, buildAlertPayload } = require('../scheduler/notify');
 const { getUnitOptions, getUnitById, getAllUnits } = require('../config/unitsHelper');
 const slackAppModule = require('../slack/app');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Senha do admin
 const ADMIN_PASSWORD = '333399';
@@ -252,60 +256,163 @@ router.get('/cadastro', (req, res) => {
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-          <span class="card-header-title">Novo Cadastro</span>
-          <a href="/items?unidade=${unidade}" class="header-link text-small" style="text-transform:none;letter-spacing:0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-            Ver itens cadastrados
-          </a>
-        </div>
-        <div class="card-body">
-          <form id="productForm">
-            <input type="hidden" id="unidade" name="unidade" value="${unidade}">
-            <div class="form-grid form-grid--2col">
-              <div class="form-field">
-                <label for="sku" class="form-label">SKU</label>
-                <input id="sku" name="sku" class="form-input" required placeholder="Ex: 123456" inputmode="numeric">
-              </div>
+      <!-- Abas -->
+      <div class="tab-bar">
+        <button class="tab-btn tab-btn--active" id="tab-btn-individual" onclick="switchTab('individual')">Item Individual</button>
+        <button class="tab-btn" id="tab-btn-planilha" onclick="switchTab('planilha')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="8" y1="9" x2="10" y2="9"></line>
+          </svg>
+          Importar Planilha
+        </button>
+      </div>
 
-              <div class="form-field">
-                <label for="nome" class="form-label">Nome / Descricao</label>
-                <input id="nome" name="nome" class="form-input" required placeholder="Ex: Batom Vermelho">
-              </div>
+      <!-- Painel: Item Individual -->
+      <div id="pane-individual" class="tab-pane tab-pane--active">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span class="card-header-title">Novo Cadastro</span>
+            <a href="/items?unidade=${unidade}" class="header-link text-small" style="text-transform:none;letter-spacing:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              Ver itens cadastrados
+            </a>
+          </div>
+          <div class="card-body">
+            <form id="productForm">
+              <input type="hidden" id="unidade" name="unidade" value="${unidade}">
+              <div class="form-grid form-grid--2col">
+                <div class="form-field">
+                  <label for="sku" class="form-label">SKU</label>
+                  <input id="sku" name="sku" class="form-input" required placeholder="Ex: 123456" inputmode="numeric">
+                </div>
 
-              <div class="form-field form-field--full">
-                <label for="validade" class="form-label">Validade</label>
-                <input id="validade" name="validade" class="form-input" type="date" required>
-              </div>
+                <div class="form-field">
+                  <label for="nome" class="form-label">Nome / Descricao</label>
+                  <input id="nome" name="nome" class="form-input" required placeholder="Ex: Batom Vermelho">
+                </div>
 
-              <div class="form-field form-field--full">
-                <div class="form-actions">
-                  <button type="button" class="btn btn--secondary" id="resetBtn">Limpar</button>
-                  <button type="submit" class="btn btn--primary" id="submitBtn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                      <polyline points="7 3 7 8 15 8"></polyline>
-                    </svg>
-                    Salvar
-                  </button>
+                <div class="form-field form-field--full">
+                  <label for="validade" class="form-label">Validade</label>
+                  <input id="validade" name="validade" class="form-input" type="date" required>
+                </div>
+
+                <div class="form-field form-field--full">
+                  <div class="form-actions">
+                    <button type="button" class="btn btn--secondary" id="resetBtn">Limpar</button>
+                    <button type="submit" class="btn btn--primary" id="submitBtn">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                      </svg>
+                      Salvar
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              <div id="resp" role="status" aria-live="polite"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel: Importar Planilha -->
+      <div id="pane-planilha" class="tab-pane">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span class="card-header-title">Importar Planilha</span>
+            <a href="/items?unidade=${unidade}" class="header-link text-small" style="text-transform:none;letter-spacing:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              Ver itens cadastrados
+            </a>
+          </div>
+          <div class="card-body">
+            <p class="text-muted text-small mb-4">
+              Envie uma planilha <strong>.xlsx</strong> com as colunas <strong>SKU</strong> e <strong>Validade</strong>.
+              Datas no formato <strong>DD-MM-AAAA</strong>. SKUs encontrados no catálogo terão o nome preenchido automaticamente.
+            </p>
+
+            <div class="upload-area" id="uploadArea">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-tertiary);margin-bottom:8px">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <p class="text-muted text-small" style="margin:0 0 12px">Arraste o arquivo aqui ou</p>
+              <label for="planilhaInput" class="btn btn--secondary" style="cursor:pointer;margin:0">
+                Selecionar arquivo
+              </label>
+              <input type="file" id="planilhaInput" accept=".xlsx,.xls" style="display:none">
+              <p id="uploadFileName" class="text-small text-muted mt-2" style="display:none"></p>
             </div>
 
-            <div id="resp" role="status" aria-live="polite"></div>
-          </form>
+            <div id="planilhaLoading" style="display:none;text-align:center;padding:24px 0">
+              <span class="btn-spinner" style="display:inline-block;margin-right:8px"></span>
+              <span class="text-muted">Lendo planilha...</span>
+            </div>
+
+            <div id="planilhaError" class="message message--error mt-4" style="display:none"></div>
+
+            <!-- Preview dos itens -->
+            <div id="planilhaPreview" style="display:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 12px">
+                <p class="text-small text-muted" id="previewCount"></p>
+                <button class="btn btn--secondary btn--sm" id="planilhaClearBtn">Limpar</button>
+              </div>
+              <div class="table-container" style="border-radius:var(--radius-md);margin-bottom:16px">
+                <table class="table" id="previewTable">
+                  <thead>
+                    <tr>
+                      <th style="width:90px">SKU</th>
+                      <th>Nome / Descrição</th>
+                      <th style="width:120px">Validade</th>
+                      <th style="width:80px">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="previewTableBody"></tbody>
+                </table>
+              </div>
+              <div class="form-actions" style="justify-content:flex-end">
+                <button class="btn btn--primary" id="planilhaSaveBtn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  Cadastrar Todos
+                </button>
+              </div>
+              <div id="loteResp" role="status" aria-live="polite" class="mt-4"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div id="toast" class="toast"></div>
+    <script>
+      function switchTab(tab) {
+        ['individual','planilha'].forEach(t => {
+          document.getElementById('pane-' + t).classList.toggle('tab-pane--active', t === tab);
+          document.getElementById('tab-btn-' + t).classList.toggle('tab-btn--active', t === tab);
+        });
+      }
+    </script>
     <script src="/public/app.js" defer></script>
     ${getServiceWorkerScript()}
   </body>
@@ -978,6 +1085,133 @@ router.post('/admin/test', requireAdminAuth, express.json(), async (req, res) =>
     console.error('Erro ao enviar teste:', err?.data?.error || err.message || err);
     return res.status(500).json({ ok: false, message: 'Falha ao enviar mensagem de teste.' });
   }
+});
+
+// ==================== IMPORTAÇÃO POR PLANILHA ====================
+
+// POST /upload-planilha — lê o xlsx e retorna preview (não salva nada)
+router.post('/upload-planilha', upload.single('planilha'), (req, res) => {
+  const cookies = parseCookies(req);
+  const unidade = cookies.unidade;
+  if (!unidade || !getUnitById(unidade)) {
+    return res.status(401).json({ ok: false, message: 'Não autenticado.' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ ok: false, message: 'Nenhum arquivo enviado.' });
+  }
+
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    if (!rows.length) {
+      return res.status(400).json({ ok: false, message: 'A planilha está vazia.' });
+    }
+
+    // Encontra as colunas SKU e Validade (insensível a maiúsculas)
+    const sampleKeys = Object.keys(rows[0]);
+    const skuKey = sampleKeys.find(k => k.toLowerCase().replace(/\s/g, '') === 'sku');
+    const validadeKey = sampleKeys.find(k =>
+      k.toLowerCase().includes('validade') || k.toLowerCase().includes('vencimento')
+    );
+
+    if (!skuKey || !validadeKey) {
+      return res.status(400).json({
+        ok: false,
+        message: `Colunas não encontradas. A planilha precisa ter colunas "SKU" e "Validade". Colunas encontradas: ${sampleKeys.join(', ')}`
+      });
+    }
+
+    const items = [];
+    for (const row of rows) {
+      const rawSku = String(row[skuKey] ?? '').trim().replace(/\.0$/, '');
+      const rawValidade = row[validadeKey];
+
+      if (!rawSku || rawSku === '' || rawSku === '0') continue;
+
+      // Parse da data: aceita DD-MM-YYYY (texto), YYYY-MM-DD, ou Date (xlsx com cellDates:true)
+      let validade = null;
+      if (rawValidade instanceof Date) {
+        const d = rawValidade;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        validade = `${y}-${m}-${day}`;
+      } else {
+        const s = String(rawValidade).trim();
+        const ddmmyyyy = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        const yyyymmdd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (ddmmyyyy) {
+          validade = `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+        } else if (yyyymmdd) {
+          validade = s;
+        }
+      }
+
+      if (!validade || !isValidDateString(validade)) continue;
+
+      const catalog = getProductFromCatalog(rawSku);
+      items.push({
+        sku: rawSku,
+        nome: catalog ? catalog.nome : null,
+        inCatalog: !!catalog,
+        validade
+      });
+    }
+
+    if (!items.length) {
+      return res.status(400).json({ ok: false, message: 'Nenhum item válido encontrado na planilha. Verifique se as colunas são "SKU" e "Validade" e se as datas estão no formato DD-MM-AAAA.' });
+    }
+
+    res.json({ ok: true, items });
+  } catch (err) {
+    console.error('Erro ao processar planilha:', err);
+    res.status(400).json({ ok: false, message: 'Erro ao ler planilha. Verifique se o arquivo é .xlsx ou .xls.' });
+  }
+});
+
+// POST /add-lote — cadastra vários itens de uma vez
+router.post('/add-lote', express.json(), async (req, res) => {
+  const cookies = parseCookies(req);
+  const unidade = cookies.unidade;
+  if (!unidade || !getUnitById(unidade)) {
+    return res.status(401).json({ ok: false, message: 'Não autenticado.' });
+  }
+
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ ok: false, message: 'Nenhum item recebido.' });
+  }
+
+  let success = 0;
+  const errors = [];
+
+  for (const item of items) {
+    const { sku, nome, validade } = item;
+    if (!sku || !nome || !nome.trim() || !validade) {
+      errors.push(`SKU ${sku}: dados incompletos.`);
+      continue;
+    }
+    if (!isValidDateString(validade)) {
+      errors.push(`SKU ${sku}: data inválida.`);
+      continue;
+    }
+    try {
+      await addProduct({ sku, nome: nome.trim(), validade, unidade });
+      const existsInCatalog = getProductFromCatalog(sku);
+      if (!existsInCatalog) {
+        addProductToCatalog({ sku, nome: nome.trim() });
+      }
+      success++;
+    } catch (err) {
+      console.error(`Erro ao salvar SKU ${sku}:`, err);
+      errors.push(`SKU ${sku}: erro ao salvar.`);
+    }
+  }
+
+  res.json({ ok: true, success, errors });
 });
 
 module.exports = router;
