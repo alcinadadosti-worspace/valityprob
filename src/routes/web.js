@@ -809,13 +809,23 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
           <div class="card mb-4">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
               <span class="card-header-title">Produtos Cadastrados (${products.length})</span>
-              <button id="trigger" class="btn btn--primary btn--sm">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 2L11 13"></path>
-                  <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
-                </svg>
-                Disparar notificacoes
-              </button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button id="trigger" class="btn btn--primary btn--sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13"></path>
+                    <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                  </svg>
+                  Disparar notificacoes
+                </button>
+                <a href="/admin/backup" class="btn btn--sm" style="background:#f0f0f0;color:#333;text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Baixar backup (xlsx)
+                </a>
+              </div>
             </div>
             <div class="table-container" style="border:0;border-radius:0">
               <table class="table">
@@ -1004,6 +1014,40 @@ router.post('/admin/notify', requireAdminAuth, async (req, res) => {
   } catch (err) {
     console.error('Erro ao executar job manualmente:', err);
     res.status(500).json({ ok: false, message: 'Erro ao executar job.' });
+  }
+});
+
+router.get('/admin/backup', requireAdminAuth, async (req, res) => {
+  try {
+    const products = await listProducts();
+
+    const byUnit = {};
+    for (const p of products) {
+      if (!byUnit[p.UNIDADE]) byUnit[p.UNIDADE] = [];
+      byUnit[p.UNIDADE].push(p);
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    for (const [unitId, items] of Object.entries(byUnit)) {
+      const unit = getUnitById(unitId);
+      const sheetName = (unit ? unit.name : unitId).slice(0, 31);
+      const rows = [['SKU', 'Nome', 'Validade']];
+      for (const item of items) {
+        rows.push([item.SKU, item.NOME, item.VALIDADE]);
+      }
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="backup-validades.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Erro ao gerar backup:', err);
+    res.status(500).send('Erro ao gerar backup');
   }
 });
 
