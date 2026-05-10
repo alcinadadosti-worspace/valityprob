@@ -9,7 +9,7 @@
       "members": [
         { "name": "Jonathan", "slackId": "U07L4D3EWJW" },
         { "name": "Yasmin Rocha", "slackId": "U08F8T8SMNE" },
-        { "name": "Luan", "slackId": "U087M32A18B" },
+        { "name": "Maria Victória Araújo", "slackId": "U08EZUH7X1C" },
         { "name": "Rômulo", "slackId": "U07LSKN7SNL" }
       ]
     },
@@ -20,7 +20,8 @@
       "members": [
         { "name": "Ana Clara", "slackId": "U08F9KK0AAG" },
         { "name": "Carol Martér", "slackId": "U0A2PUWCUKS" },
-        { "name": "Rômulo", "slackId": "U07LSKN7SNL" }
+        { "name": "Rômulo", "slackId": "U07LSKN7SNL" },
+        { "name": "Rodrigo Augusto Teixeira Dos Santos", "slackId": "U0922F5KB7U" }
       ]
     },
     {
@@ -28,7 +29,7 @@
       "name": "Loja Palmeira dos Indios",
       "code": "24668",
       "members": [
-        { "name": "Roberia", "slackId": "U08B1MQJL3C" },
+        { "name": "Maria Cicília Brito Veiga", "slackId": "U0AL2NDNH09" },
         { "name": "Leidiane", "slackId": "U07KX76F7D4" },
         { "name": "Kemilly", "slackId": "U087HDEARA9" }
       ]
@@ -40,7 +41,8 @@
       "members": [
         { "name": "Maryanna Trajano", "slackId": "U09ED214T6W" },
         { "name": "Kemilly", "slackId": "U087HDEARA9" },
-        { "name": "Leidiane", "slackId": "U07KX76F7D4" }
+        { "name": "Leidiane", "slackId": "U07KX76F7D4" },
+        { "name": "Nayara Kimura", "slackId": "U0B1D2NM47M" }
       ]
     },
     {
@@ -48,7 +50,8 @@
       "name": "Loja Teotonio Vilela",
       "code": "24671",
       "members": [
-        { "name": "Eliene", "slackId": "U087P8JF97F" },
+        { "name": "Shayane Ferreira", "slackId": "U0AT1KKLWNS" },
+        { "name": "Josenildo Alves", "slackId": "U0ASY08QHTN" },
         { "name": "Leidiane", "slackId": "U07KX76F7D4" }
       ]
     },
