@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog, deleteProduct } = require('../storage');
+const { addProduct, listProducts, listProductsByUnit, listExchanges, getProductFromCatalog, addProductToCatalog, deleteProduct, updateProduct } = require('../storage');
 const { isValidDateString, parseDate, daysUntil } = require('../utils/dates');
 const { runNotificationJob, sendAlertsToMember, buildAlertPayload } = require('../scheduler/notify');
 const { getUnitOptions, getUnitById, getAllUnits } = require('../config/unitsHelper');
@@ -487,22 +487,40 @@ router.get('/items', async (req, res) => {
 
   const selectedUnit = selectedUnidade ? getUnitById(selectedUnidade) : null;
 
+  const escapeAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
   const rows = products.length > 0 ? products.map(p => {
     const unit = getUnitById(p.UNIDADE);
+    let status = 'ok';
+    try {
+      const days = daysUntil(parseDate(p.VALIDADE));
+      if (days < 0) status = 'vencido';
+      else if (days <= 7) status = 'proximo';
+      else if (days <= 30) status = 'medio';
+    } catch (_) {}
     return `
-    <tr data-sku="${p.SKU}">
+    <tr data-sku="${escapeAttr(p.SKU)}" data-nome="${escapeAttr(p.NOME)}" data-validade="${escapeAttr(p.VALIDADE)}" data-status="${status}">
       <td>${p.SKU}</td>
       <td>${p.NOME}</td>
-      <td>${p.VALIDADE}</td>
+      <td><span class="badge-validade badge-validade--${status}">${p.VALIDADE}</span></td>
       <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
       <td>
-        <button class="btn btn--danger btn--sm" onclick="deleteProduct('${p.SKU}', this)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Excluir
-        </button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn--secondary btn--sm" onclick="openEditModal('${escapeAttr(p.SKU)}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Editar
+          </button>
+          <button class="btn btn--danger btn--sm" onclick="deleteProduct('${escapeAttr(p.SKU)}', this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Excluir
+          </button>
+        </div>
       </td>
     </tr>
   `;
@@ -545,6 +563,32 @@ router.get('/items', async (req, res) => {
           <div class="card-header">
             <span class="card-header-title">Lista de Demonstradores</span>
           </div>
+          <div class="card-body" style="padding-bottom:0">
+            <div class="filter-bar" style="padding-top:0">
+              <div class="form-field" style="flex:1;min-width:220px;margin:0">
+                <input type="search" id="filterSearch" class="form-input" placeholder="Buscar por SKU ou nome..." autocomplete="off">
+              </div>
+              <div class="form-field" style="margin:0">
+                <select id="filterStatus" class="form-input">
+                  <option value="">Todos os status</option>
+                  <option value="vencido">Vencidos</option>
+                  <option value="proximo">Vencem em até 7 dias</option>
+                  <option value="medio">Vencem em até 30 dias</option>
+                  <option value="ok">Vencimento distante</option>
+                </select>
+              </div>
+              <div class="form-field" style="margin:0">
+                <select id="filterSort" class="form-input">
+                  <option value="validade-asc">Validade (mais próxima)</option>
+                  <option value="validade-desc">Validade (mais distante)</option>
+                  <option value="sku-asc">SKU (A-Z)</option>
+                  <option value="nome-asc">Nome (A-Z)</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn--secondary btn--sm" id="filterClearBtn">Limpar</button>
+            </div>
+            <p class="text-small text-muted" id="filterCount" style="margin:8px 0 12px"></p>
+          </div>
           <div class="table-container" style="border:0;border-radius:0">
             <table class="table">
               <thead>
@@ -553,16 +597,130 @@ router.get('/items', async (req, res) => {
                   <th>Nome</th>
                   <th>Validade</th>
                   <th>Unidade</th>
-                  <th style="width:120px">Acoes</th>
+                  <th style="width:200px">Acoes</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="itemsTbody">
                 ${rows || '<tr><td colspan="5" class="table-empty">Nenhum item cadastrado</td></tr>'}
               </tbody>
             </table>
           </div>
+          <div id="emptyFilterMsg" class="table-empty" style="display:none;padding:24px;text-align:center">
+            Nenhum item corresponde aos filtros.
+          </div>
         </div>
       </div>
+
+      <!-- Modal de edição -->
+      <div id="editModal" class="modal-overlay" style="display:none">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3 class="modal-title">Editar Item</h3>
+            <button type="button" class="modal-close" onclick="closeEditModal()" aria-label="Fechar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <form id="editForm">
+            <div class="modal-body">
+              <input type="hidden" id="editSku">
+              <div class="form-field mb-4">
+                <label class="form-label">SKU</label>
+                <input type="text" id="editSkuDisplay" class="form-input" disabled>
+              </div>
+              <div class="form-field mb-4">
+                <label for="editNome" class="form-label">Nome / Descricao</label>
+                <input type="text" id="editNome" class="form-input" required>
+              </div>
+              <div class="form-field">
+                <label for="editValidade" class="form-label">Validade</label>
+                <input type="date" id="editValidade" class="form-input" required>
+              </div>
+              <div id="editError" class="message message--error mt-4" style="display:none"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn--secondary" onclick="closeEditModal()">Cancelar</button>
+              <button type="submit" class="btn btn--primary" id="editSaveBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Salvar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <style>
+        .badge-validade {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 500;
+          background: #e8f5e9;
+          color: #1b5e20;
+        }
+        .badge-validade--vencido { background: #ffebee; color: #b71c1c; }
+        .badge-validade--proximo { background: #fff3e0; color: #e65100; }
+        .badge-validade--medio { background: #fffde7; color: #827717; }
+        .badge-validade--ok { background: #e8f5e9; color: #1b5e20; }
+
+        .modal-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+        }
+        .modal-box {
+          background: var(--surface, #fff);
+          border-radius: var(--radius-md, 8px);
+          width: 100%;
+          max-width: 480px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--border, #e0e0e0);
+        }
+        .modal-title {
+          font-size: 16px;
+          font-weight: 600;
+          margin: 0;
+        }
+        .modal-close {
+          background: none;
+          border: 0;
+          cursor: pointer;
+          color: var(--text-secondary, #666);
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .modal-close:hover { color: var(--text-primary, #000); }
+        .modal-body { padding: 20px; }
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 12px 20px;
+          border-top: 1px solid var(--border, #e0e0e0);
+        }
+      </style>
 
       <div id="toast" class="toast"></div>
 
@@ -589,7 +747,7 @@ router.get('/items', async (req, res) => {
               row.style.transition = 'opacity 0.3s, transform 0.3s';
               row.style.opacity = '0';
               row.style.transform = 'translateX(10px)';
-              setTimeout(() => row.remove(), 300);
+              setTimeout(() => { row.remove(); applyFilters(); }, 300);
               showToast('Item excluido com sucesso!');
             } else {
               showToast('Erro: ' + data.message);
@@ -602,6 +760,159 @@ router.get('/items', async (req, res) => {
             btn.innerHTML = 'Excluir';
           }
         }
+
+        // ===== EDIÇÃO =====
+        function openEditModal(sku) {
+          const row = document.querySelector('tr[data-sku="' + CSS.escape(sku) + '"]');
+          if (!row) return;
+
+          document.getElementById('editSku').value = sku;
+          document.getElementById('editSkuDisplay').value = sku;
+          document.getElementById('editNome').value = row.dataset.nome || '';
+          document.getElementById('editValidade').value = row.dataset.validade || '';
+          document.getElementById('editError').style.display = 'none';
+          document.getElementById('editModal').style.display = 'flex';
+          setTimeout(() => document.getElementById('editNome').focus(), 50);
+        }
+
+        function closeEditModal() {
+          document.getElementById('editModal').style.display = 'none';
+        }
+
+        document.getElementById('editModal').addEventListener('click', (e) => {
+          if (e.target.id === 'editModal') closeEditModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && document.getElementById('editModal').style.display !== 'none') {
+            closeEditModal();
+          }
+        });
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const sku = document.getElementById('editSku').value;
+          const nome = document.getElementById('editNome').value.trim();
+          const validade = document.getElementById('editValidade').value;
+          const errEl = document.getElementById('editError');
+          const btn = document.getElementById('editSaveBtn');
+
+          if (!nome || !validade) {
+            errEl.textContent = 'Preencha todos os campos.';
+            errEl.style.display = 'block';
+            return;
+          }
+
+          btn.disabled = true;
+          const originalHtml = btn.innerHTML;
+          btn.innerHTML = '<span class="btn-spinner"></span> Salvando...';
+          errEl.style.display = 'none';
+
+          try {
+            const res = await fetch('/api/products/' + encodeURIComponent(sku), {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nome, validade })
+            });
+            const data = await res.json();
+
+            if (data.ok) {
+              // Atualiza a linha em memória
+              const row = document.querySelector('tr[data-sku="' + CSS.escape(sku) + '"]');
+              if (row) {
+                row.dataset.nome = nome;
+                row.dataset.validade = validade;
+                row.cells[1].textContent = nome;
+
+                // Recalcula status (parse manual evita bug de timezone com new Date('YYYY-MM-DD'))
+                const today = new Date(); today.setHours(0,0,0,0);
+                const [vy, vm, vd] = validade.split('-').map(Number);
+                const target = new Date(vy, vm - 1, vd);
+                const days = Math.floor((target - today) / (1000*60*60*24));
+                let status = 'ok';
+                if (days < 0) status = 'vencido';
+                else if (days <= 7) status = 'proximo';
+                else if (days <= 30) status = 'medio';
+                row.dataset.status = status;
+                row.cells[2].innerHTML = '<span class="badge-validade badge-validade--' + status + '">' + validade + '</span>';
+              }
+              closeEditModal();
+              showToast('Item atualizado com sucesso!');
+              applyFilters();
+            } else {
+              errEl.textContent = data.message || 'Erro ao atualizar.';
+              errEl.style.display = 'block';
+            }
+          } catch (err) {
+            errEl.textContent = 'Erro de rede ao atualizar.';
+            errEl.style.display = 'block';
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+          }
+        });
+
+        // ===== FILTROS E ORDENAÇÃO =====
+        const searchEl = document.getElementById('filterSearch');
+        const statusEl = document.getElementById('filterStatus');
+        const sortEl = document.getElementById('filterSort');
+        const tbody = document.getElementById('itemsTbody');
+        const emptyMsg = document.getElementById('emptyFilterMsg');
+        const countEl = document.getElementById('filterCount');
+
+        function applyFilters() {
+          const term = (searchEl.value || '').toLowerCase().trim();
+          const status = statusEl.value;
+          const sort = sortEl.value;
+
+          const rows = Array.from(tbody.querySelectorAll('tr[data-sku]'));
+          let visible = 0;
+
+          rows.forEach(row => {
+            const sku = (row.dataset.sku || '').toLowerCase();
+            const nome = (row.dataset.nome || '').toLowerCase();
+            const rowStatus = row.dataset.status || '';
+
+            const matchesTerm = !term || sku.includes(term) || nome.includes(term);
+            const matchesStatus = !status || rowStatus === status;
+            const show = matchesTerm && matchesStatus;
+
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+          });
+
+          // Ordenação
+          const sortedRows = rows.slice().sort((a, b) => {
+            if (sort === 'sku-asc') return (a.dataset.sku || '').localeCompare(b.dataset.sku || '', 'pt', { numeric: true });
+            if (sort === 'nome-asc') return (a.dataset.nome || '').localeCompare(b.dataset.nome || '', 'pt');
+            const da = a.dataset.validade || '';
+            const db = b.dataset.validade || '';
+            if (sort === 'validade-desc') return db.localeCompare(da);
+            return da.localeCompare(db);
+          });
+          sortedRows.forEach(r => tbody.appendChild(r));
+
+          const total = rows.length;
+          if (total === 0) {
+            countEl.textContent = '';
+            emptyMsg.style.display = 'none';
+          } else {
+            countEl.textContent = visible + ' de ' + total + ' ' + (total === 1 ? 'item' : 'itens');
+            emptyMsg.style.display = visible === 0 ? 'block' : 'none';
+          }
+        }
+
+        searchEl.addEventListener('input', applyFilters);
+        statusEl.addEventListener('change', applyFilters);
+        sortEl.addEventListener('change', applyFilters);
+        document.getElementById('filterClearBtn').addEventListener('click', () => {
+          searchEl.value = '';
+          statusEl.value = '';
+          sortEl.value = 'validade-asc';
+          applyFilters();
+        });
+
+        applyFilters();
       </script>
       ${getServiceWorkerScript()}
     </body>
@@ -636,6 +947,46 @@ router.delete('/api/products/:sku', async (req, res) => {
   } catch (err) {
     console.error('Erro ao excluir produto:', err);
     res.status(500).json({ ok: false, message: 'Erro ao excluir produto.' });
+  }
+});
+
+// Editar produto (nome e/ou validade)
+router.put('/api/products/:sku', express.json(), async (req, res) => {
+  const { sku } = req.params;
+  const { nome, validade } = req.body || {};
+
+  if (!nome && !validade) {
+    return res.status(400).json({ ok: false, message: 'Informe nome ou validade para atualizar.' });
+  }
+
+  if (nome !== undefined && (typeof nome !== 'string' || !nome.trim())) {
+    return res.status(400).json({ ok: false, message: 'Nome inválido.' });
+  }
+
+  if (validade !== undefined && !isValidDateString(validade)) {
+    return res.status(400).json({ ok: false, message: 'Data inválida.' });
+  }
+
+  try {
+    const updated = await updateProduct({
+      sku,
+      nome: nome !== undefined ? nome.trim() : undefined,
+      validade: validade !== undefined ? validade : undefined
+    });
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, message: 'Produto não encontrado.' });
+    }
+
+    // Atualiza também o catálogo se o nome mudou
+    if (nome !== undefined && nome.trim()) {
+      addProductToCatalog({ sku, nome: nome.trim() });
+    }
+
+    res.json({ ok: true, message: 'Produto atualizado com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao atualizar produto:', err);
+    res.status(500).json({ ok: false, message: 'Erro ao atualizar produto.' });
   }
 });
 

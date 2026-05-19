@@ -99,6 +99,24 @@ const deleteProduct = (sku) => {
   return true;
 };
 
+const updateProduct = ({ sku, nome, validade }) => {
+  ensureProductsFile();
+  const products = listProducts();
+  const idx = products.findIndex(p => p.SKU === sku);
+  if (idx === -1) return false;
+
+  if (nome !== undefined) products[idx].NOME = nome;
+  if (validade !== undefined) products[idx].VALIDADE = validade;
+
+  const output = stringify(products, {
+    header: true,
+    columns: ['SKU', 'NOME', 'VALIDADE', 'UNIDADE']
+  });
+
+  fs.writeFileSync(PRODUCTS_FILE, output);
+  return true;
+};
+
 // ==================== EXCHANGES ====================
 
 const listExchanges = () => {
@@ -251,6 +269,7 @@ module.exports = {
   listProducts,
   listProductsByUnit,
   addProduct,
+  updateProduct,
   deleteProduct,
   addExchange,
   hasExchange,

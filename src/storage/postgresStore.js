@@ -53,6 +53,16 @@ const deleteProduct = async (sku) => {
   return true;
 };
 
+const updateProduct = async ({ sku, nome, validade }) => {
+  const pool = getPool();
+  const res = await pool.query(
+    `UPDATE products SET nome = COALESCE($2, nome), validade = COALESCE($3, validade) WHERE sku = $1`,
+    [sku, nome ?? null, validade ?? null]
+  );
+  await pool.end();
+  return res.rowCount > 0;
+};
+
 // ==================== EXCHANGES ====================
 
 const addExchange = async ({ sku, produtoNome, userId, userName, unidade, validade }) => {
@@ -215,6 +225,7 @@ module.exports = {
   listProducts,
   listProductsByUnit,
   addProduct,
+  updateProduct,
   deleteProduct,
   addExchange,
   hasExchange,
