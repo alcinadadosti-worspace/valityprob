@@ -489,6 +489,8 @@ router.get('/items', async (req, res) => {
 
   const escapeAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+  const statusCounts = { vencido: 0, proximo: 0, medio: 0, ok: 0 };
+
   const rows = products.length > 0 ? products.map(p => {
     const unit = getUnitById(p.UNIDADE);
     let status = 'ok';
@@ -498,6 +500,7 @@ router.get('/items', async (req, res) => {
       else if (days <= 7) status = 'proximo';
       else if (days <= 30) status = 'medio';
     } catch (_) {}
+    statusCounts[status]++;
     return `
     <tr data-sku="${escapeAttr(p.SKU)}" data-nome="${escapeAttr(p.NOME)}" data-validade="${escapeAttr(p.VALIDADE)}" data-status="${status}">
       <td>${p.SKU}</td>
@@ -558,6 +561,48 @@ router.get('/items', async (req, res) => {
             <p class="header-subtitle">${products.length} ${products.length === 1 ? 'item' : 'itens'}${selectedUnit ? ` em ${selectedUnit.name}` : ''}</p>
           </div>
         </div>
+
+        ${products.length > 0 ? `
+        <div class="card mb-4">
+          <div class="card-header">
+            <span class="card-header-title">Resumo de Validade</span>
+          </div>
+          <div class="card-body">
+            <div class="chart-grid">
+              <div class="chart-canvas-wrap">
+                <canvas id="statusChart"></canvas>
+                <div class="chart-center">
+                  <div class="chart-center-num">${products.length}</div>
+                  <div class="chart-center-lbl">${products.length === 1 ? 'item' : 'itens'}</div>
+                </div>
+              </div>
+              <div class="chart-legend">
+                <button type="button" class="chart-legend-item" data-status="vencido">
+                  <span class="chart-legend-dot" style="background:#b71c1c"></span>
+                  <span class="chart-legend-label">Vencidos</span>
+                  <span class="chart-legend-count">${statusCounts.vencido}</span>
+                </button>
+                <button type="button" class="chart-legend-item" data-status="proximo">
+                  <span class="chart-legend-dot" style="background:#e65100"></span>
+                  <span class="chart-legend-label">Vencem em até 7 dias</span>
+                  <span class="chart-legend-count">${statusCounts.proximo}</span>
+                </button>
+                <button type="button" class="chart-legend-item" data-status="medio">
+                  <span class="chart-legend-dot" style="background:#c0a000"></span>
+                  <span class="chart-legend-label">Vencem em 8 a 30 dias</span>
+                  <span class="chart-legend-count">${statusCounts.medio}</span>
+                </button>
+                <button type="button" class="chart-legend-item" data-status="ok">
+                  <span class="chart-legend-dot" style="background:#1b5e20"></span>
+                  <span class="chart-legend-label">Mais de 30 dias</span>
+                  <span class="chart-legend-count">${statusCounts.ok}</span>
+                </button>
+              </div>
+            </div>
+            <p class="text-small text-muted mt-2" style="margin-bottom:0">Clique em uma categoria para filtrar a lista abaixo.</p>
+          </div>
+        </div>
+        ` : ''}
 
         <div class="card">
           <div class="card-header">
@@ -720,10 +765,89 @@ router.get('/items', async (req, res) => {
           padding: 12px 20px;
           border-top: 1px solid var(--border, #e0e0e0);
         }
+
+        .chart-grid {
+          display: grid;
+          grid-template-columns: minmax(180px, 240px) 1fr;
+          gap: 24px;
+          align-items: center;
+        }
+        @media (max-width: 600px) {
+          .chart-grid { grid-template-columns: 1fr; }
+        }
+        .chart-canvas-wrap {
+          position: relative;
+          width: 100%;
+          max-width: 240px;
+          aspect-ratio: 1;
+          margin: 0 auto;
+        }
+        .chart-center {
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          text-align: center;
+          pointer-events: none;
+        }
+        .chart-center-num {
+          font-size: 28px;
+          font-weight: 700;
+          color: var(--text-primary, #1a1a1a);
+          line-height: 1;
+        }
+        .chart-center-lbl {
+          font-size: 12px;
+          color: var(--text-secondary, #666);
+          margin-top: 4px;
+        }
+        .chart-legend {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .chart-legend-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 12px;
+          border: 1px solid var(--border, #e0e0e0);
+          border-radius: var(--radius-md, 8px);
+          background: transparent;
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .chart-legend-item:hover {
+          background: var(--bg-secondary, #f5f5f5);
+          border-color: var(--accent, #006837);
+        }
+        .chart-legend-item.is-active {
+          background: var(--bg-secondary, #f5f5f5);
+          border-color: var(--accent, #006837);
+        }
+        .chart-legend-dot {
+          width: 12px; height: 12px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .chart-legend-label {
+          flex: 1;
+          font-size: 14px;
+          color: var(--text-primary, #1a1a1a);
+        }
+        .chart-legend-count {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary, #1a1a1a);
+          min-width: 24px;
+          text-align: right;
+        }
       </style>
 
       <div id="toast" class="toast"></div>
 
+      <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
       <script>
         function showToast(msg) {
           const toast = document.getElementById('toast');
@@ -903,16 +1027,79 @@ router.get('/items', async (req, res) => {
         }
 
         searchEl.addEventListener('input', applyFilters);
-        statusEl.addEventListener('change', applyFilters);
+        statusEl.addEventListener('change', () => { updateLegendActive(); applyFilters(); });
         sortEl.addEventListener('change', applyFilters);
         document.getElementById('filterClearBtn').addEventListener('click', () => {
           searchEl.value = '';
           statusEl.value = '';
           sortEl.value = 'validade-asc';
+          updateLegendActive();
           applyFilters();
         });
 
+        function updateLegendActive() {
+          document.querySelectorAll('.chart-legend-item').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.status === statusEl.value);
+          });
+        }
+
+        // Legenda clicável: filtra a tabela pelo status selecionado
+        document.querySelectorAll('.chart-legend-item').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const s = btn.dataset.status;
+            statusEl.value = statusEl.value === s ? '' : s;
+            updateLegendActive();
+            applyFilters();
+            document.getElementById('itemsTbody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+
         applyFilters();
+
+        // ===== GRÁFICO DONUT =====
+        const STATUS_DATA = ${JSON.stringify(statusCounts)};
+        const canvas = document.getElementById('statusChart');
+        if (canvas && window.Chart && (STATUS_DATA.vencido + STATUS_DATA.proximo + STATUS_DATA.medio + STATUS_DATA.ok) > 0) {
+          const order = ['vencido', 'proximo', 'medio', 'ok'];
+          new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+              labels: ['Vencidos', 'Até 7 dias', '8 a 30 dias', 'Mais de 30 dias'],
+              datasets: [{
+                data: order.map(k => STATUS_DATA[k]),
+                backgroundColor: ['#b71c1c', '#e65100', '#c0a000', '#1b5e20'],
+                borderWidth: 2,
+                borderColor: '#fff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              cutout: '65%',
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                      const v = ctx.parsed;
+                      const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+                      return ctx.label + ': ' + v + ' (' + pct + '%)';
+                    }
+                  }
+                }
+              },
+              onClick: (_evt, elements) => {
+                if (!elements.length) return;
+                const s = order[elements[0].index];
+                statusEl.value = statusEl.value === s ? '' : s;
+                updateLegendActive();
+                applyFilters();
+                document.getElementById('itemsTbody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          });
+        }
       </script>
       ${getServiceWorkerScript()}
     </body>
