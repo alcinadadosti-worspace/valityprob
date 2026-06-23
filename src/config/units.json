@@ -74,6 +74,15 @@
         { "name": "Leidiane", "slackId": "U07KX76F7D4" },
         { "name": "Taciane Pereira", "slackId": "U07L6EAUS75" }
       ]
+    },
+    {
+      "id": "loja-palmeira-sustentavel",
+      "name": "Loja Palmeira Sustentavel",
+      "code": "24617",
+      "members": [
+        { "name": "Kemilly", "slackId": "U087HDEARA9", "role": "gerente" },
+        { "name": "Eduarda Pereira", "slackId": "U0AKMS2LNEA", "role": "colaborador" }
+      ]
     }
   ]
 }
