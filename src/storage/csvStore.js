@@ -2,11 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
 const { stringify } = require('csv-stringify/sync');
+const catalog = require('./catalogStore');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.csv');
 const EXCHANGES_FILE = path.join(DATA_DIR, 'exchanges.csv');
-const CATALOG_FILE = path.join(DATA_DIR, 'estoque.csv');
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.csv');
 
 // ==================== FILE HELPERS ====================
 
@@ -32,10 +33,10 @@ const ensureExchangesFile = () => {
   }
 };
 
-const ensureCatalogFile = () => {
+const ensureNotificationsFile = () => {
   ensureDir();
-  if (!fs.existsSync(CATALOG_FILE)) {
-    fs.writeFileSync(CATALOG_FILE, 'Produto;Descrição\n');
+  if (!fs.existsSync(NOTIFICATIONS_FILE)) {
+    fs.writeFileSync(NOTIFICATIONS_FILE, ['SKU', 'UNIDADE', 'VALIDADE', 'NOTIFIED_AT'].join(',') + '\n');
   }
 };
 
@@ -65,8 +66,9 @@ const addProduct = ({ sku, nome, validade, unidade }) => {
   ensureProductsFile();
   let products = listProducts();
 
-  // Remove produto existente com mesmo SKU (upsert)
-  products = products.filter(p => p.SKU !== sku);
+  // Remove produto existente com mesmo SKU na MESMA unidade (upsert).
+  // O mesmo SKU em outra loja é um item diferente e precisa ser preservado.
+  products = products.filter(p => !(p.SKU === sku && p.UNIDADE === unidade));
 
   // Adiciona novo produto
   products.push({
@@ -85,12 +87,13 @@ const addProduct = ({ sku, nome, validade, unidade }) => {
   return true;
 };
 
-const deleteProduct = (sku) => {
+const deleteProduct = (sku, unidade) => {
   ensureProductsFile();
-  let products = listProducts();
-  products = products.filter(p => p.SKU !== sku);
+  const products = listProducts();
+  const remaining = products.filter(p => !(p.SKU === sku && p.UNIDADE === unidade));
+  if (remaining.length === products.length) return false;
 
-  const output = stringify(products, {
+  const output = stringify(remaining, {
     header: true,
     columns: ['SKU', 'NOME', 'VALIDADE', 'UNIDADE']
   });
@@ -99,10 +102,10 @@ const deleteProduct = (sku) => {
   return true;
 };
 
-const updateProduct = ({ sku, nome, validade }) => {
+const updateProduct = ({ sku, unidade, nome, validade }) => {
   ensureProductsFile();
   const products = listProducts();
-  const idx = products.findIndex(p => p.SKU === sku);
+  const idx = products.findIndex(p => p.SKU === sku && p.UNIDADE === unidade);
   if (idx === -1) return false;
 
   if (nome !== undefined) products[idx].NOME = nome;
@@ -188,82 +191,31 @@ const deleteExchange = (sku, unidade, validade) => {
   return true;
 };
 
-// ==================== CATALOG (estoque.csv) ====================
-// Colunas: Produto (SKU), Descrição (nome do item)
-// Usa ponto-e-vírgula como separador
-// CACHE em memória para busca rápida (arquivo tem 180k+ linhas)
+// ==================== NOTIFICATIONS (ledger de alertas enviados) ====================
+// Marca que já enviamos o alerta de "faltam N dias" para um (sku, unidade, validade),
+// para não reenviar todo ciclo do cron. Mudar a validade cria uma chave nova (novo ciclo).
 
-let catalogCache = null;
-let catalogDescKey = null;
-
-const loadCatalogCache = () => {
-  if (catalogCache) return;
-
-  ensureCatalogFile();
-  const products = readCsv(CATALOG_FILE, ';');
-
-  // Cria um Map indexado por SKU para busca O(1)
-  catalogCache = new Map();
-
-  if (products.length > 0) {
-    catalogDescKey = Object.keys(products[0]).find(k => k.includes('Descri')) || 'Descrição';
-
-    for (const p of products) {
-      // Só guarda o primeiro (evita duplicados)
-      if (!catalogCache.has(p.Produto)) {
-        catalogCache.set(p.Produto, p[catalogDescKey] || '');
-      }
-    }
-  }
-
-  console.log(`📦 Catálogo carregado: ${catalogCache.size} produtos únicos`);
+const hasNotified = (sku, unidade, validade) => {
+  ensureNotificationsFile();
+  const rows = readCsv(NOTIFICATIONS_FILE);
+  return rows.some(n => n.SKU === sku && n.UNIDADE === unidade && n.VALIDADE === (validade || ''));
 };
 
-const getProductFromCatalog = (sku) => {
-  loadCatalogCache();
+const addNotified = ({ sku, unidade, validade }) => {
+  ensureNotificationsFile();
+  const rows = readCsv(NOTIFICATIONS_FILE);
+  const v = validade || '';
+  if (rows.some(n => n.SKU === sku && n.UNIDADE === unidade && n.VALIDADE === v)) return true;
 
-  if (catalogCache.has(sku)) {
-    return { sku, nome: catalogCache.get(sku) };
-  }
-  return null;
-};
-
-const addProductToCatalog = ({ sku, nome }) => {
-  loadCatalogCache();
-
-  // Adiciona ao cache
-  catalogCache.set(sku, nome);
-
-  // Também salva no arquivo
-  ensureCatalogFile();
-  let products = readCsv(CATALOG_FILE, ';');
-  products = products.filter(p => p.Produto !== sku);
-
-  const descKey = catalogDescKey || 'Descrição';
-  const newProduct = { Produto: sku };
-  newProduct[descKey] = nome;
-  products.push(newProduct);
-
-  const columns = ['Produto', descKey];
-  const output = stringify(products, {
-    header: true,
-    columns: columns,
-    delimiter: ';'
-  });
-
-  fs.writeFileSync(CATALOG_FILE, output);
+  rows.push({ SKU: sku, UNIDADE: unidade, VALIDADE: v, NOTIFIED_AT: new Date().toISOString() });
+  fs.writeFileSync(NOTIFICATIONS_FILE, stringify(rows, {
+    header: true, columns: ['SKU', 'UNIDADE', 'VALIDADE', 'NOTIFIED_AT']
+  }));
   return true;
 };
 
-const listCatalog = () => {
-  loadCatalogCache();
-
-  const result = [];
-  for (const [sku, nome] of catalogCache) {
-    result.push({ sku, nome });
-  }
-  return result;
-};
+// ==================== CATALOG ====================
+// Implementação compartilhada com o postgresStore (o catálogo é sempre CSV).
 
 module.exports = {
   listProducts,
@@ -277,7 +229,7 @@ module.exports = {
   listExchanges,
   listExchangesByUnit,
   deleteExchange,
-  getProductFromCatalog,
-  addProductToCatalog,
-  listCatalog
+  hasNotified,
+  addNotified,
+  ...catalog
 };

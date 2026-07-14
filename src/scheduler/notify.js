@@ -1,7 +1,13 @@
 const cron = require('node-cron');
-const { listProducts, hasExchange } = require('../storage');
+const { listProducts, hasExchange, hasNotified, addNotified } = require('../storage');
 const { parseDate, daysUntil, TIMEZONE, getToday } = require('../utils/dates');
 const { getAllUnits, getMemberSlackIds, getUnitById } = require('../config/unitsHelper');
+
+// Alerta quando faltam ESTE número de dias OU MENOS (e o item ainda não venceu).
+// Era `days === 7` (dia exato): se o servidor não rodasse naquele dia — o plano free do
+// Render hiberna, além de redeploys — o alerta se perdia para sempre. Com <=, pega o item
+// no próximo ciclo; o ledger de notificações garante que não reenvia.
+const ALERT_DAYS = 7;
 
 // Memória simples para evitar duplicação no mesmo ciclo de vida do processo
 const executionHistory = new Set();
@@ -20,6 +26,32 @@ const scheduleNotifications = (app) => {
   });
 };
 
+// Seleciona, por unidade, os itens que vencem em até ALERT_DAYS dias (e ainda não
+// venceram), pulando os já trocados e os que já receberam alerta para esta validade.
+// Extraído para ser testável sem depender do Slack nem do dedup por horário.
+const selectAlertsByUnit = async (products) => {
+  const alertsByUnit = {};
+  for (const p of products) {
+    const days = daysUntil(parseDate(p.VALIDADE));
+    // Number.isFinite pula datas malformadas: daysUntil retorna NaN, e NaN não é < 0
+    // nem > ALERT_DAYS, então sem esta guarda o item entraria no alerta indevidamente.
+    if (!Number.isFinite(days) || days < 0 || days > ALERT_DAYS) continue;
+
+    const unidade = p.UNIDADE;
+    if (!unidade) continue;
+
+    if (await hasExchange(p.SKU, unidade, p.VALIDADE)) {
+      console.log(`Produto ${p.SKU} (validade ${p.VALIDADE}) já foi trocado na unidade ${unidade}. Pulando.`);
+      continue;
+    }
+    if (await hasNotified(p.SKU, unidade, p.VALIDADE)) continue; // já avisado; não reenvia
+
+    if (!alertsByUnit[unidade]) alertsByUnit[unidade] = [];
+    alertsByUnit[unidade].push(p);
+  }
+  return alertsByUnit;
+};
+
 const runNotificationJob = async (app) => {
   const now = getToday();
   const currentHour = new Date().toLocaleTimeString('pt-BR', { timeZone: TIMEZONE, hour: '2-digit' });
@@ -32,30 +64,9 @@ const runNotificationJob = async (app) => {
 
   try {
     const products = await listProducts();
-    const alertsByUnit = {};
 
-    // 1. Filtrar produtos que vencem em exatos 7 dias e agrupar por unidade
-    for (const p of products) {
-      const expiryDate = parseDate(p.VALIDADE);
-      const days = daysUntil(expiryDate);
-
-      if (days === 7) {
-        const unidade = p.UNIDADE;
-        if (!unidade) continue;
-
-        // Verifica se já foi trocado (agora considera a validade)
-        const exchanged = await hasExchange(p.SKU, unidade, p.VALIDADE);
-        if (exchanged) {
-          console.log(`Produto ${p.SKU} (validade ${p.VALIDADE}) já foi trocado na unidade ${unidade}. Pulando.`);
-          continue;
-        }
-
-        if (!alertsByUnit[unidade]) {
-          alertsByUnit[unidade] = [];
-        }
-        alertsByUnit[unidade].push(p);
-      }
-    }
+    // 1. Selecionar itens que vencem em até ALERT_DAYS dias, ainda não trocados nem avisados.
+    const alertsByUnit = await selectAlertsByUnit(products);
 
     // 2. Enviar DMs para TODOS os membros de cada unidade
     for (const [unidade, items] of Object.entries(alertsByUnit)) {
@@ -67,12 +78,26 @@ const runNotificationJob = async (app) => {
         continue;
       }
 
+      let anySuccess = false;
       for (const slackUserId of memberSlackIds) {
         try {
           await sendAlertsToMember(app, slackUserId, items, unidade);
+          anySuccess = true;
           console.log(`Mensagem enviada para ${slackUserId} (unidade: ${unidade}) com ${items.length} itens.`);
         } catch (err) {
           console.error(`Falha ao enviar alertas para ${slackUserId}:`, err?.data?.error || err.message || err);
+        }
+      }
+
+      // Só marca como notificado se ALGUÉM recebeu. Se todos falharem, deixa para o próximo
+      // ciclo tentar de novo (não perde o alerta).
+      if (anySuccess) {
+        for (const item of items) {
+          try {
+            await addNotified({ sku: item.SKU, unidade, validade: item.VALIDADE });
+          } catch (err) {
+            console.error(`Falha ao registrar notificação de ${item.SKU}/${unidade}:`, err.message);
+          }
         }
       }
     }
@@ -205,6 +230,8 @@ const sendAlertsToMember = async (app, slackUserId, items, unidade) => {
 module.exports = {
   scheduleNotifications,
   runNotificationJob,
+  selectAlertsByUnit,
   buildAlertPayload,
-  sendAlertsToMember
+  sendAlertsToMember,
+  ALERT_DAYS
 };
