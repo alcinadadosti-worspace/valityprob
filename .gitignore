@@ -5,3 +5,5 @@ data/last_run.json
 # Manter products.csv no git se quiser persistência inicial, 
 # mas geralmente dados de produção são ignorados. 
 # Como é um "banco local", vou deixar descomentado para o exemplo.
+# Planilhas de recuperacao (dados de producao)
+recuperacao/

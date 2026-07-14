@@ -47,11 +47,31 @@ function parseCookies(req) {
   const cookieHeader = req.headers.cookie;
   if (cookieHeader) {
     cookieHeader.split(';').forEach(cookie => {
-      const [name, value] = cookie.trim().split('=');
-      cookies[name] = decodeURIComponent(value);
+      const trimmed = cookie.trim();
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) return;
+      // split só no primeiro '=': valores base64/com '=' não podem ser truncados
+      const name = trimmed.slice(0, eq);
+      const value = trimmed.slice(eq + 1);
+      try {
+        cookies[name] = decodeURIComponent(value);
+      } catch (_) {
+        cookies[name] = value;
+      }
     });
   }
   return cookies;
+}
+
+// Escapa texto para interpolação segura em HTML (conteúdo e atributos com aspas).
+// Sem isso, o nome de um produto como "<script>..." é injetado cru na página (XSS armazenado).
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Página inicial - Seleção de Unidade
@@ -423,7 +443,11 @@ router.get('/cadastro', (req, res) => {
 
 // Processar POST de cadastro
 router.post('/add', express.urlencoded({ extended: true }), async (req, res) => {
-  const { sku, nome, validade, unidade } = req.body;
+  // SKU sem trim vira uma chave diferente: " 76621" e "76621" seriam dois produtos
+  // distintos e o nome não seria encontrado no catálogo.
+  const sku = String(req.body.sku ?? '').trim();
+  const nome = String(req.body.nome ?? '').trim();
+  const { validade, unidade } = req.body;
 
   if (!sku || !nome || !validade || !unidade) {
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
@@ -450,10 +474,14 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
   try {
     await addProduct({ sku, nome, validade, unidade });
 
-    // Salva também no catálogo (estoque.csv) se for um produto novo
-    const existsInCatalog = getProductFromCatalog(sku);
-    if (!existsInCatalog) {
-      addProductToCatalog({ sku, nome });
+    // Salva também no catálogo (estoque.csv) se for um produto novo. Falha aqui NÃO deve
+    // derrubar o cadastro: o produto já foi salvo acima. Só registra no log.
+    try {
+      if (!getProductFromCatalog(sku)) {
+        addProductToCatalog({ sku, nome });
+      }
+    } catch (catErr) {
+      console.error('Aviso: falha ao atualizar catálogo (produto já salvo):', catErr.message);
     }
 
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
@@ -472,22 +500,24 @@ router.post('/add', express.urlencoded({ extended: true }), async (req, res) => 
 // Lista de itens com filtro por unidade
 router.get('/items', async (req, res) => {
   const cookies = parseCookies(req);
-  const unidadeFromCookie = cookies.unidade;
-  const { unidade } = req.query;
+  const { unidade: unidadeQuery } = req.query;
 
-  // Sempre usa a unidade do cookie, ignorando query params
-  const selectedUnidade = unidadeFromCookie;
+  // Prefere ?unidade= (usado pelo link do Slack) quando é uma unidade válida; senão o
+  // cookie. Sem nenhuma unidade válida, redireciona — nunca lista os itens de TODAS as
+  // lojas (o comportamento antigo vazava tudo para quem acessasse /items sem cookie).
+  const selectedUnidade =
+    (unidadeQuery && getUnitById(unidadeQuery)) ? unidadeQuery :
+    (cookies.unidade && getUnitById(cookies.unidade)) ? cookies.unidade :
+    null;
 
-  let products;
-  if (selectedUnidade) {
-    products = await listProductsByUnit(selectedUnidade);
-  } else {
-    products = await listProducts();
+  if (!selectedUnidade) {
+    return res.redirect('/');
   }
 
-  const selectedUnit = selectedUnidade ? getUnitById(selectedUnidade) : null;
+  const products = await listProductsByUnit(selectedUnidade);
+  const selectedUnit = getUnitById(selectedUnidade);
 
-  const escapeAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const escapeAttr = escapeHtml;
 
   const statusCounts = { vencido: 0, proximo: 0, medio: 0, ok: 0 };
 
@@ -503,20 +533,20 @@ router.get('/items', async (req, res) => {
     statusCounts[status]++;
     return `
     <tr data-sku="${escapeAttr(p.SKU)}" data-nome="${escapeAttr(p.NOME)}" data-validade="${escapeAttr(p.VALIDADE)}" data-status="${status}">
-      <td>${p.SKU}</td>
-      <td>${p.NOME}</td>
-      <td><span class="badge-validade badge-validade--${status}">${p.VALIDADE}</span></td>
-      <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
+      <td>${escapeHtml(p.SKU)}</td>
+      <td>${escapeHtml(p.NOME)}</td>
+      <td><span class="badge-validade badge-validade--${status}">${escapeHtml(p.VALIDADE)}</span></td>
+      <td>${escapeHtml(unit ? unit.name : (p.UNIDADE || '-'))}</td>
       <td>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn--secondary btn--sm" onclick="openEditModal('${escapeAttr(p.SKU)}')">
+          <button class="btn btn--secondary btn--sm" data-action="edit">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
             Editar
           </button>
-          <button class="btn btn--danger btn--sm" onclick="deleteProduct('${escapeAttr(p.SKU)}', this)">
+          <button class="btn btn--danger btn--sm" data-action="delete">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -856,6 +886,17 @@ router.get('/items', async (req, res) => {
           setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
+        // Delegação: os botões usam data-action (sem JS inline no HTML, evita XSS via SKU/nome).
+        document.getElementById('itemsTbody').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-action]');
+          if (!btn) return;
+          const row = btn.closest('tr[data-sku]');
+          if (!row) return;
+          const sku = row.dataset.sku;
+          if (btn.dataset.action === 'edit') openEditModal(sku);
+          else if (btn.dataset.action === 'delete') deleteProduct(sku, btn);
+        });
+
         async function deleteProduct(sku, btn) {
           if (!confirm('Tem certeza que deseja excluir este item?')) return;
 
@@ -1124,12 +1165,21 @@ router.get('/api/catalog/:sku', (req, res) => {
 
 // ==================== API DE PRODUTOS ====================
 
-// Deletar produto (demonstrador)
+// Deletar produto (demonstrador) — só na unidade autenticada
 router.delete('/api/products/:sku', async (req, res) => {
   const { sku } = req.params;
+  const cookies = parseCookies(req);
+  const unidade = cookies.unidade;
+
+  if (!unidade || !getUnitById(unidade)) {
+    return res.status(401).json({ ok: false, message: 'Não autenticado. Selecione sua unidade novamente.' });
+  }
 
   try {
-    await deleteProduct(sku);
+    const removed = await deleteProduct(sku, unidade);
+    if (!removed) {
+      return res.status(404).json({ ok: false, message: 'Produto não encontrado nesta unidade.' });
+    }
     res.json({ ok: true, message: 'Produto excluído com sucesso!' });
   } catch (err) {
     console.error('Erro ao excluir produto:', err);
@@ -1137,10 +1187,16 @@ router.delete('/api/products/:sku', async (req, res) => {
   }
 });
 
-// Editar produto (nome e/ou validade)
+// Editar produto (nome e/ou validade) — só na unidade autenticada
 router.put('/api/products/:sku', express.json(), async (req, res) => {
   const { sku } = req.params;
   const { nome, validade } = req.body || {};
+  const cookies = parseCookies(req);
+  const unidade = cookies.unidade;
+
+  if (!unidade || !getUnitById(unidade)) {
+    return res.status(401).json({ ok: false, message: 'Não autenticado. Selecione sua unidade novamente.' });
+  }
 
   if (!nome && !validade) {
     return res.status(400).json({ ok: false, message: 'Informe nome ou validade para atualizar.' });
@@ -1157,12 +1213,13 @@ router.put('/api/products/:sku', express.json(), async (req, res) => {
   try {
     const updated = await updateProduct({
       sku,
+      unidade,
       nome: nome !== undefined ? nome.trim() : undefined,
       validade: validade !== undefined ? validade : undefined
     });
 
     if (!updated) {
-      return res.status(404).json({ ok: false, message: 'Produto não encontrado.' });
+      return res.status(404).json({ ok: false, message: 'Produto não encontrado nesta unidade.' });
     }
 
     // Atualiza também o catálogo se o nome mudou
@@ -1276,10 +1333,10 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
     const unit = getUnitById(p.UNIDADE);
     return `
     <tr>
-      <td>${p.SKU}</td>
-      <td>${p.NOME}</td>
-      <td>${p.VALIDADE}</td>
-      <td>${unit ? unit.name : p.UNIDADE || '-'}</td>
+      <td>${escapeHtml(p.SKU)}</td>
+      <td>${escapeHtml(p.NOME)}</td>
+      <td>${escapeHtml(p.VALIDADE)}</td>
+      <td>${escapeHtml(unit ? unit.name : (p.UNIDADE || '-'))}</td>
     </tr>
   `;
   }).join('') : '';
@@ -1288,16 +1345,16 @@ router.get('/admin', requireAdminAuth, async (req, res) => {
     const unit = getUnitById(e.unidade);
     return `
     <tr>
-      <td>${e.sku}</td>
-      <td>${e.produtoNome || '-'}</td>
-      <td>${unit ? unit.name : e.unidade}</td>
-      <td>${e.userName}</td>
-      <td>${e.clickedAt || '-'}</td>
+      <td>${escapeHtml(e.sku)}</td>
+      <td>${escapeHtml(e.produtoNome || '-')}</td>
+      <td>${escapeHtml(unit ? unit.name : e.unidade)}</td>
+      <td>${escapeHtml(e.userName)}</td>
+      <td>${escapeHtml(e.clickedAt || '-')}</td>
     </tr>
   `;
   }).join('') : '';
 
-  const unitOptions = getAllUnits().map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  const unitOptions = getAllUnits().map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)}</option>`).join('');
 
   const html = `
     <!doctype html>
@@ -1771,8 +1828,10 @@ router.post('/add-lote', express.json(), async (req, res) => {
   const errors = [];
 
   for (const item of items) {
-    const { sku, nome, validade } = item;
-    if (!sku || !nome || !nome.trim() || !validade) {
+    const sku = String(item.sku ?? '').trim();
+    const nome = String(item.nome ?? '').trim();
+    const { validade } = item;
+    if (!sku || !nome || !validade) {
       errors.push(`SKU ${sku}: dados incompletos.`);
       continue;
     }
@@ -1781,10 +1840,14 @@ router.post('/add-lote', express.json(), async (req, res) => {
       continue;
     }
     try {
-      await addProduct({ sku, nome: nome.trim(), validade, unidade });
-      const existsInCatalog = getProductFromCatalog(sku);
-      if (!existsInCatalog) {
-        addProductToCatalog({ sku, nome: nome.trim() });
+      await addProduct({ sku, nome, validade, unidade });
+      // Catálogo é secundário: falha aqui não invalida o cadastro do produto.
+      try {
+        if (!getProductFromCatalog(sku)) {
+          addProductToCatalog({ sku, nome });
+        }
+      } catch (catErr) {
+        console.error(`Aviso: catálogo não atualizado para SKU ${sku} (produto salvo):`, catErr.message);
       }
       success++;
     } catch (err) {
@@ -1793,7 +1856,12 @@ router.post('/add-lote', express.json(), async (req, res) => {
     }
   }
 
-  res.json({ ok: true, success, errors });
+  // ok reflete se ALGO foi salvo — antes retornava ok:true mesmo com tudo falhando.
+  const payload = { ok: success > 0, success, errors };
+  if (success === 0) {
+    payload.message = errors.length ? `Nenhum item salvo. ${errors.join('; ')}` : 'Nenhum item salvo.';
+  }
+  res.json(payload);
 });
 
 module.exports = router;
