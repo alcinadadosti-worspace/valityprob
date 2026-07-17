@@ -635,8 +635,15 @@ router.get('/items', async (req, res) => {
         ` : ''}
 
         <div class="card">
-          <div class="card-header">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
             <span class="card-header-title">Lista de Demonstradores</span>
+            <button type="button" class="btn btn--primary btn--sm" id="openAddBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Cadastrar item
+            </button>
           </div>
           <div class="card-body" style="padding-bottom:0">
             <div class="filter-bar" style="padding-top:0">
@@ -724,6 +731,49 @@ router.get('/items', async (req, res) => {
                   <polyline points="7 3 7 8 15 8"></polyline>
                 </svg>
                 Salvar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal de cadastro de novo item -->
+      <div id="addModal" class="modal-overlay" style="display:none">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3 class="modal-title">Cadastrar Item</h3>
+            <button type="button" class="modal-close" onclick="closeAddModal()" aria-label="Fechar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <form id="addForm">
+            <div class="modal-body">
+              <div class="form-field mb-4">
+                <label for="addSku" class="form-label">SKU</label>
+                <input type="text" id="addSku" class="form-input" required placeholder="Ex: 123456" inputmode="numeric" autocomplete="off">
+              </div>
+              <div class="form-field mb-4">
+                <label for="addNome" class="form-label">Nome / Descricao</label>
+                <input type="text" id="addNome" class="form-input" required placeholder="Ex: Batom Vermelho" autocomplete="off">
+              </div>
+              <div class="form-field">
+                <label for="addValidade" class="form-label">Validade</label>
+                <input type="date" id="addValidade" class="form-input" required>
+              </div>
+              <div id="addError" class="message message--error mt-4" style="display:none"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn--secondary" onclick="closeAddModal()">Cancelar</button>
+              <button type="submit" class="btn btn--primary" id="addSaveBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Cadastrar
               </button>
             </div>
           </form>
@@ -1012,6 +1062,105 @@ router.get('/items', async (req, res) => {
             errEl.textContent = 'Erro de rede ao atualizar.';
             errEl.style.display = 'block';
           } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+          }
+        });
+
+        // ===== CADASTRO DE NOVO ITEM =====
+        // Reaproveita o endpoint /add (mesmo do cadastro individual): faz upsert por
+        // (sku, unidade) e alimenta o catálogo. Depois recarrega para o resumo, o gráfico
+        // e o status colorido refletirem o novo item sem risco de ficarem dessincronizados.
+        const UNIDADE = ${JSON.stringify(selectedUnidade)};
+        const addModal = document.getElementById('addModal');
+        const addSku = document.getElementById('addSku');
+        const addNome = document.getElementById('addNome');
+        const addValidade = document.getElementById('addValidade');
+        const addError = document.getElementById('addError');
+
+        document.getElementById('openAddBtn').addEventListener('click', openAddModal);
+
+        function openAddModal() {
+          document.getElementById('addForm').reset();
+          addError.style.display = 'none';
+          addNome.placeholder = 'Ex: Batom Vermelho';
+          addModal.style.display = 'flex';
+          setTimeout(() => addSku.focus(), 50);
+        }
+
+        function closeAddModal() {
+          addModal.style.display = 'none';
+        }
+
+        addModal.addEventListener('click', (e) => {
+          if (e.target.id === 'addModal') closeAddModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && addModal.style.display !== 'none') closeAddModal();
+        });
+
+        // Ao sair do SKU, busca o nome no catálogo (mesma UX da tela de cadastro).
+        addSku.addEventListener('blur', async () => {
+          const sku = addSku.value.trim();
+          if (!sku) return;
+          try {
+            const res = await fetch('/api/catalog/' + encodeURIComponent(sku));
+            const data = await res.json();
+            if (data.found) {
+              addNome.value = data.nome;
+              showToast('Produto encontrado no catalogo!');
+            } else if (!addNome.value.trim()) {
+              addNome.placeholder = 'Produto novo - digite o nome';
+              addNome.focus();
+            }
+          } catch (_) { /* silencioso: o usuário ainda pode digitar o nome */ }
+        });
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const sku = addSku.value.trim();
+          const nome = addNome.value.trim();
+          const validade = addValidade.value;
+          const btn = document.getElementById('addSaveBtn');
+
+          if (!sku || !nome || !validade) {
+            addError.textContent = 'Preencha todos os campos.';
+            addError.style.display = 'block';
+            return;
+          }
+
+          btn.disabled = true;
+          const originalHtml = btn.innerHTML;
+          btn.innerHTML = '<span class="btn-spinner"></span> Salvando...';
+          addError.style.display = 'none';
+
+          try {
+            const params = new URLSearchParams();
+            params.append('sku', sku);
+            params.append('nome', nome);
+            params.append('validade', validade);
+            params.append('unidade', UNIDADE);
+
+            const res = await fetch('/add', {
+              method: 'POST',
+              headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+              body: params.toString()
+            });
+            const data = await res.json().catch(() => null);
+
+            if (res.ok && data && data.ok) {
+              showToast('Item cadastrado com sucesso!');
+              setTimeout(() => window.location.reload(), 600);
+            } else {
+              addError.textContent = (data && data.message) ? data.message : 'Erro ao cadastrar.';
+              addError.style.display = 'block';
+              btn.disabled = false;
+              btn.innerHTML = originalHtml;
+            }
+          } catch (err) {
+            addError.textContent = 'Falha de rede. Tente novamente.';
+            addError.style.display = 'block';
             btn.disabled = false;
             btn.innerHTML = originalHtml;
           }
