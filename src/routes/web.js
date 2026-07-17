@@ -688,7 +688,17 @@ router.get('/items', async (req, res) => {
             </table>
           </div>
           <div id="emptyFilterMsg" class="table-empty" style="display:none;padding:24px;text-align:center">
-            Nenhum item corresponde aos filtros.
+            <span id="emptyFilterText">Nenhum item corresponde aos filtros.</span>
+            <div id="notFoundOffer" style="display:none">
+              <p id="notFoundText" class="text-small text-muted" style="margin:0 0 12px"></p>
+              <button type="button" class="btn btn--primary btn--sm" id="offerAddBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Cadastrar este item
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1078,14 +1088,24 @@ router.get('/items', async (req, res) => {
         const addValidade = document.getElementById('addValidade');
         const addError = document.getElementById('addError');
 
-        document.getElementById('openAddBtn').addEventListener('click', openAddModal);
+        document.getElementById('openAddBtn').addEventListener('click', () => openAddModal());
 
-        function openAddModal() {
+        // prefillSku (opcional): abre o modal ja com o SKU preenchido e busca o nome no catalogo.
+        function openAddModal(prefillSku) {
           document.getElementById('addForm').reset();
           addError.style.display = 'none';
           addNome.placeholder = 'Ex: Batom Vermelho';
           addModal.style.display = 'flex';
-          setTimeout(() => addSku.focus(), 50);
+          const sku = (typeof prefillSku === 'string') ? prefillSku.trim() : '';
+          if (sku) {
+            addSku.value = sku;
+            lookupSkuIntoNome(sku).then(() => {
+              if (addNome.value.trim()) addValidade.focus();
+              else addNome.focus();
+            });
+          } else {
+            setTimeout(() => addSku.focus(), 50);
+          }
         }
 
         function closeAddModal() {
@@ -1101,21 +1121,23 @@ router.get('/items', async (req, res) => {
         });
 
         // Ao sair do SKU, busca o nome no catálogo (mesma UX da tela de cadastro).
-        addSku.addEventListener('blur', async () => {
-          const sku = addSku.value.trim();
-          if (!sku) return;
+        addSku.addEventListener('blur', () => lookupSkuIntoNome(addSku.value));
+
+        // Busca o SKU no catálogo e preenche o nome. Não mexe no foco (quem chama decide).
+        async function lookupSkuIntoNome(sku) {
+          const s = String(sku || '').trim();
+          if (!s) return;
           try {
-            const res = await fetch('/api/catalog/' + encodeURIComponent(sku));
+            const res = await fetch('/api/catalog/' + encodeURIComponent(s));
             const data = await res.json();
             if (data.found) {
               addNome.value = data.nome;
               showToast('Produto encontrado no catalogo!');
             } else if (!addNome.value.trim()) {
               addNome.placeholder = 'Produto novo - digite o nome';
-              addNome.focus();
             }
           } catch (_) { /* silencioso: o usuário ainda pode digitar o nome */ }
-        });
+        }
 
         document.getElementById('addForm').addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -1173,14 +1195,45 @@ router.get('/items', async (req, res) => {
         const tbody = document.getElementById('itemsTbody');
         const emptyMsg = document.getElementById('emptyFilterMsg');
         const countEl = document.getElementById('filterCount');
+        const emptyFilterText = document.getElementById('emptyFilterText');
+        const notFoundOffer = document.getElementById('notFoundOffer');
+        const notFoundText = document.getElementById('notFoundText');
+        const offerAddBtn = document.getElementById('offerAddBtn');
+        let offerSku = '';
+        let offerLookupTimer = null;
+        let offerLookupSeq = 0;
+
+        // Botao da oferta: abre o modal ja com o SKU buscado.
+        offerAddBtn.addEventListener('click', () => openAddModal(offerSku));
+
+        // Monta o texto da oferta e, de forma assincrona, tenta achar o nome no catalogo
+        // para deixar a pergunta mais clara ("<nome> (SKU X) ainda nao esta cadastrado...").
+        function updateOffer(rawTerm) {
+          offerSku = rawTerm;
+          notFoundText.textContent = 'Nenhum item com "' + rawTerm + '" cadastrado nesta unidade. Deseja cadastra-lo?';
+          clearTimeout(offerLookupTimer);
+          const seq = ++offerLookupSeq;
+          offerLookupTimer = setTimeout(async () => {
+            try {
+              const res = await fetch('/api/catalog/' + encodeURIComponent(rawTerm));
+              const data = await res.json();
+              if (seq !== offerLookupSeq) return; // resultado obsoleto: o usuario continuou digitando
+              if (data.found) {
+                notFoundText.textContent = '"' + data.nome + '" (SKU ' + rawTerm + ') ainda nao esta cadastrado nesta unidade. Deseja cadastra-lo?';
+              }
+            } catch (_) { /* silencioso */ }
+          }, 300);
+        }
 
         function applyFilters() {
-          const term = (searchEl.value || '').toLowerCase().trim();
+          const rawTerm = (searchEl.value || '').trim();
+          const term = rawTerm.toLowerCase();
           const status = statusEl.value;
           const sort = sortEl.value;
 
           const rows = Array.from(tbody.querySelectorAll('tr[data-sku]'));
           let visible = 0;
+          let termMatchCount = 0; // linhas que batem com a busca, IGNORANDO o filtro de status
 
           rows.forEach(row => {
             const sku = (row.dataset.sku || '').toLowerCase();
@@ -1188,6 +1241,7 @@ router.get('/items', async (req, res) => {
             const rowStatus = row.dataset.status || '';
 
             const matchesTerm = !term || sku.includes(term) || nome.includes(term);
+            if (term && matchesTerm) termMatchCount++;
             const matchesStatus = !status || rowStatus === status;
             const show = matchesTerm && matchesStatus;
 
@@ -1207,12 +1261,21 @@ router.get('/items', async (req, res) => {
           sortedRows.forEach(r => tbody.appendChild(r));
 
           const total = rows.length;
-          if (total === 0) {
-            countEl.textContent = '';
-            emptyMsg.style.display = 'none';
+          countEl.textContent = total === 0 ? '' : (visible + ' de ' + total + ' ' + (total === 1 ? 'item' : 'itens'));
+
+          // Oferta de cadastro: o usuario buscou um SKU/termo que NAO existe nesta unidade
+          // (mesmo ignorando o filtro de status). Se existe mas o status o escondeu, mostra
+          // apenas a mensagem generica — nao faz sentido oferecer cadastrar algo que ja existe.
+          const showOffer = !!rawTerm && termMatchCount === 0;
+          if (showOffer) {
+            emptyFilterText.style.display = 'none';
+            notFoundOffer.style.display = 'block';
+            emptyMsg.style.display = 'block';
+            updateOffer(rawTerm);
           } else {
-            countEl.textContent = visible + ' de ' + total + ' ' + (total === 1 ? 'item' : 'itens');
-            emptyMsg.style.display = visible === 0 ? 'block' : 'none';
+            notFoundOffer.style.display = 'none';
+            emptyFilterText.style.display = '';
+            emptyMsg.style.display = (total > 0 && visible === 0) ? 'block' : 'none';
           }
         }
 
